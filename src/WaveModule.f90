@@ -8,16 +8,27 @@ module WaveModule
 !===============================================================================
 ! Subroutine to set up the global mesh and local ot global numbering
 !===============================================================================
-  subroutine Setup_mesh(i_bool, rho, mu)
-    integer i_spec, i_gll, i_glob
+  subroutine Setup_mesh(i_bool, rho, mu, h_prime, jacobian_mat, jacobian)
+    integer i_spec, i_gll, i_glob, i_h_prime, j_h_prime
     real(dp), dimension(0:NUM_SPEC_EL) :: anchor_points
     real(dp), dimension(NUM_GLL) :: gll_points, gll_weights
     real(dp), dimension(NUM_GLOBAL_POINTS) :: global_points, rho, mu
     integer, dimension(NUM_GLL, NUM_SPEC_EL) :: i_bool
+    real(dp), dimension(NUM_GLL, NUM_SPEC_EL) :: jacobian_mat, jacobian
+    real(dp), dimension(NUM_GLL, NUM_GLL) :: h_prime
+    real(dp), external :: lagrange_deriv_GLL
 
     ! GLL points and weights
     call zwgljd(gll_points,gll_weights,NUM_GLL,0.0_dp,0.0_dp)
     if(mod(NUM_GLL,2) /= 0) gll_points((NUM_GLL-1)/2+1) = 0.0_dp
+
+    ! get the derivatives of the Lagrange polynomials at 
+    ! the GLL points; recall that  h_prime(i,j)=h'_{j}(xigll_{i}) 
+    do i_h_prime=1,NUM_GLL
+       do j_h_prime=1,NUM_GLL
+          h_prime(i_h_prime,j_h_prime) = lagrange_deriv_GLL(j_h_prime-1,i_h_prime-1,gll_points,NUM_GLL)
+       end do
+    end do
 
     ! Setup anchor points
     do i_spec = 0, NUM_SPEC_EL
@@ -42,13 +53,20 @@ module WaveModule
       enddo
     enddo
 
+    do i_spec = 1,NUM_SPEC_EL
+      do i_gll = 1,NUM_GLL
+        jacobian_mat(i_gll,i_spec) = 2. / (anchor_points(i_spec -1)-anchor_points(i_spec)) ! This is d(xi) / dx
+        jacobian(i_gll,i_spec) = (anchor_points(i_spec -1)-anchor_points(i_spec)) / 2.
+      enddo
+    enddo
+
     ! Set mesh properties
     rho = density_fn(global_points)
     mu = rigidity_fn(global_points)
 
   end subroutine Setup_mesh
 
-  subroutine Assemble_global_mass_matrix(rho, jacobian, i_bool, gll_weights)
+  function mass_mat_glob(rho, jacobian, i_bool, gll_weights)
     real(dp) rho(:), jacobian(:, :), gll_weights(:)
     integer i_bool(:, :)
     integer i_spec, i_gll, i_glob
@@ -61,9 +79,48 @@ module WaveModule
         mass_mat_glob(i_glob) = mass_mat_glob(i_glob) + mass_mat_local
       enddo
     enddo
-  end subroutine Assemble_global_mass_matrix
+  end function mass_mat_glob
 
-  subroutine Increment_system()
+  subroutine Increment_system(displ, vel, accel, rho, mu, mass_mat, i_bool, h_prime,&
+   gll_weights, jacobian_mat, jacobian, delta_t)
+    real(dp) displ(:), vel(:), accel(:), rho(:), mu(:), mass_mat(:), h_prime(:, :),&
+     gll_weights(:), jacobian_mat(:,:), jacobian(:,:)
+    integer i_bool(:, :)
+    real(dp) delta_t, du_dxi, epsilon, sigma
+    integer i_spec, i_gll, j_gll, k_gll, i_glob
+    real(dp) temp(NUM_GLL)
+    real(dp) templ
 
+    ! `Predictor' update displacement using explicit finite-difference time scheme (Newmark)
+      displ(:) = displ(:) + delta_t * vel(:) + delta_t**2/2 * accel(:)
+      vel(:) = vel(:) + delta_t/2  *accel(:)
+      accel(:) = 0.
+
+      do i_spec = 1,NUM_SPEC_EL
+        do i_gll = 1,NUM_GLL
+          ! Compute d(u) / d(xi)
+          du_dxi = 0.
+          do j_gll = 1,NUM_GLL
+            i_glob = i_bool(j_gll,i_spec)
+            du_dxi = du_dxi + displ(i_glob)*h_prime(i_gll,j_gll)
+          enddo
+          i_glob = i_bool(i_gll, i_spec)
+          ! Strain (i.e., d(u) / dx in 1D)
+          epsilon = du_dxi*jacobian_mat(i_gll,i_spec)
+          ! stress
+          sigma = mu(i_glob)*epsilon
+          temp(i_gll) = jacobian(i_gll,i_spec)*sigma*jacobian_mat(i_gll,i_spec)
+        enddo ! first loop over the GLL points
+        do k_gll = 1,NUM_GLL
+          templ = 0.
+          do i_gll = 1,NUM_GLL
+            templ = templ + temp(i_gll)*h_prime(i_gll,k_gll)*gll_weights(i_gll)
+          enddo
+          ! `Corrector' update of acceleration in the Newmark scheme
+          ! The minus sign comes from the integration by part done in the weak formulation of the equations
+          i_glob = i_bool(k_gll,i_spec)
+          accel(i_glob) = accel(i_glob) - templ
+        enddo ! Second loop over the GLL points
+      enddo ! End loop over all spectral elements
   end subroutine Increment_system
 end module WaveModule
