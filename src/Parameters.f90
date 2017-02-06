@@ -14,6 +14,8 @@ module Parameters
   real(dp), parameter :: TOTAL_TIME = 5 ! Total simulation time / s
   integer, parameter :: SNAPSHOT_TIMESTEP = 100 ! No. of Timesteps between snapshots
 
+  integer, parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + 1
+
 ! Model parameters
   real(dp), parameter :: LENGTH = 10000 ! 
 
@@ -41,5 +43,18 @@ module Parameters
       rigidity_fn(i_mesh) = 1.0d10
     enddo
   end function rigidity_fn
+
+  subroutine Initial_conditions(displ, vel)
+    real(dp) displ(:), vel(:)
+    integer i_displ, i_vel
+
+    do i_displ = 1, size(displ)
+      displ(i_displ) = sin(PI * dble(i_displ) / size(displ))
+    enddo
+
+    do i_vel = 1, size(vel)
+      vel(i_vel) = 0.d0
+    enddo
+  end subroutine Initial_conditions
 
 end module Parameters
