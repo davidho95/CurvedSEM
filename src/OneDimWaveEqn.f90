@@ -47,16 +47,18 @@ program OneDimWaveEqn
 ! Index variables
   integer timestep
 
-  call Setup_mesh(i_bool, rho, mu, gll_weights, h_prime, jacobian_mat, jacobian)
+  call Setup_mesh(i_bool, rho, mu, global_points, gll_weights, h_prime, jacobian_mat, jacobian)
 
   mass_mat = mass_mat_glob(rho, jacobian, i_bool, gll_weights)
 
-  call Initial_conditions(displ, vel)
+  accel(:) = 0
+
+  call Initial_conditions(global_points, displ, vel)
 
   do timestep = 1, NUM_TIMESTEPS
     call Increment_system(displ, vel, accel, rho, mu, mass_mat, i_bool, h_prime,&
-   gll_weights, jacobian_mat, jacobian, DELTA_T)
-    !if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) call Output_snapshot()
+      gll_weights, jacobian_mat, jacobian, DELTA_T)
+    if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) call Output_snapshot("../output/", global_points, displ, timestep)
   enddo
 
 end program OneDimWaveEqn

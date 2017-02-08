@@ -8,12 +8,12 @@ module Parameters
   real(dp), parameter :: PI = 3.141592653589793d0
 
 ! Simulation parameters
-  integer, parameter :: NUM_SPEC_EL = 100 ! No. of spectral elements
+  integer, parameter :: NUM_SPEC_EL = 200 ! No. of spectral elements
   integer, parameter :: NUM_GLL = 4 ! No. of Gauss-Lobatto-Legendre points
-  integer, parameter :: NUM_TIMESTEPS = 1000 ! No. of time steps to calculate
-  real(dp), parameter :: TOTAL_TIME = 5 ! Total simulation time / s
+  integer, parameter :: NUM_TIMESTEPS = 100000 ! No. of time steps to calculate
+  real(dp), parameter :: TOTAL_TIME = 1. ! Total simulation time / s
   real(dp), parameter :: delta_t = TOTAL_TIME / dble(NUM_TIMESTEPS)
-  integer, parameter :: SNAPSHOT_TIMESTEP = 100 ! No. of Timesteps between snapshots
+  integer, parameter :: SNAPSHOT_TIMESTEP = 500 ! No. of Timesteps between snapshots
 
   integer, parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + 1
 
@@ -41,16 +41,16 @@ module Parameters
     real(dp) rigidity_fn(size(mesh))
     integer i_mesh
     do i_mesh = 1, size(mesh)
-      rigidity_fn(i_mesh) = 1.0d10
+      rigidity_fn(i_mesh) = 3.0d13
     enddo
   end function rigidity_fn
 
-  subroutine Initial_conditions(displ, vel)
-    real(dp) displ(:), vel(:)
+  subroutine Initial_conditions(global_points, displ, vel)
+    real(dp) global_points(:), displ(:), vel(:)
     integer i_displ, i_vel
 
     do i_displ = 1, size(displ)
-      displ(i_displ) = sin(PI * dble(i_displ) / size(displ))
+      displ(i_displ) = sin(PI * global_points(i_displ) / LENGTH)
     enddo
 
     do i_vel = 1, size(vel)

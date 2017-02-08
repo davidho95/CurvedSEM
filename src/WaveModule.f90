@@ -8,7 +8,7 @@ module WaveModule
 !===============================================================================
 ! Subroutine to set up the global mesh and local ot global numbering
 !===============================================================================
-  subroutine Setup_mesh(i_bool, rho, mu, h_prime, jacobian_mat, jacobian)
+  subroutine Setup_mesh(i_bool, rho, mu, global_points, gll_weights, h_prime, jacobian_mat, jacobian)
     integer i_spec, i_gll, i_glob, i_h_prime, j_h_prime
     real(dp), dimension(0:NUM_SPEC_EL) :: anchor_points
     real(dp), dimension(NUM_GLL) :: gll_points, gll_weights
@@ -35,6 +35,13 @@ module WaveModule
       anchor_points(i_spec) = dble(i_spec) * LENGTH / dble(NUM_SPEC_EL)
     enddo
 
+    do i_spec = 1,NUM_SPEC_EL
+      do i_gll = 1,NUM_GLL
+        jacobian_mat(i_gll,i_spec) = 2. / (anchor_points(i_spec)-anchor_points(i_spec-1)) ! This is d(xi) / dx
+        jacobian(i_gll,i_spec) = (anchor_points(i_spec)-anchor_points(i_spec-1)) / 2.
+      enddo
+    enddo
+
     ! Local to global numbering
     i_glob = 1
     do i_spec = 1,NUM_SPEC_EL
@@ -48,15 +55,8 @@ module WaveModule
     do i_spec = 1,NUM_SPEC_EL
       do i_gll = 1,NUM_GLL
         i_glob = i_bool(i_gll,i_spec)
-        global_points(i_glob) = 0.5*(1.-gll_points(i_gll))*anchor_points(i_spec)&
-          +0.5*(1.+gll_points(i_gll))*anchor_points(i_spec - 1)
-      enddo
-    enddo
-
-    do i_spec = 1,NUM_SPEC_EL
-      do i_gll = 1,NUM_GLL
-        jacobian_mat(i_gll,i_spec) = 2. / (anchor_points(i_spec -1)-anchor_points(i_spec)) ! This is d(xi) / dx
-        jacobian(i_gll,i_spec) = (anchor_points(i_spec -1)-anchor_points(i_spec)) / 2.
+        global_points(i_glob) = 0.5*(1.-gll_points(i_gll))*anchor_points(i_spec-1)&
+          +0.5*(1.+gll_points(i_gll))*anchor_points(i_spec)
       enddo
     enddo
 
@@ -95,7 +95,6 @@ module WaveModule
       displ(:) = displ(:) + delta_t * vel(:) + delta_t**2/2 * accel(:)
       vel(:) = vel(:) + delta_t/2  *accel(:)
       accel(:) = 0.
-
       do i_spec = 1,NUM_SPEC_EL
         do i_gll = 1,NUM_GLL
           ! Compute d(u) / d(xi)
@@ -122,5 +121,29 @@ module WaveModule
           accel(i_glob) = accel(i_glob) - templ
         enddo ! Second loop over the GLL points
       enddo ! End loop over all spectral elements
+
+      ! Fixed BCs for now
+     accel(1) = 0.
+      accel(NUM_GLOBAL_POINTS) = 0.
+
+      ! Divide by the mass matrix, which is strictly (i.e. perfectly) diagonal
+      accel(:) = accel(:)/mass_mat(:)
+      ! `Corrector' update velocity
+      vel(:) = vel(:) + delta_t/2 * accel(:)
   end subroutine Increment_system
+
+  subroutine Output_snapshot(snapshot_dir, global_points, displ, timestep)
+    character(len=*) snapshot_dir
+    real(dp) global_points(:), displ(:)
+    integer timestep, i_glob
+    character(len=50) snapshot_file
+
+    write(snapshot_file, "('snapshot',i5.5)") timestep
+
+    open(unit=10, file=snapshot_dir//snapshot_file, status="replace")
+    do i_glob = 1, NUM_GLOBAL_POINTS
+      write(10,*) sngl(global_points(i_glob)),sngl(displ(i_glob))
+    enddo
+  end subroutine Output_snapshot
+
 end module WaveModule
