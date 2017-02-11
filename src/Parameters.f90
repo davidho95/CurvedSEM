@@ -13,13 +13,13 @@ module Parameters
 ! Simulation parameters
   integer, parameter :: NUM_SPEC_EL = 200 ! No. of spectral elements
   integer, parameter :: NUM_GLL = 4 ! No. of Gauss-Lobatto-Legendre points
-  integer, parameter :: NUM_TIMESTEPS = 5000 ! No. of time steps to calculate
-  integer, parameter :: SNAPSHOT_TIMESTEP = 50 ! No. of Timesteps between snapshots
+  integer, parameter :: NUM_TIMESTEPS = 2000 ! No. of time steps to calculate
+  integer, parameter :: SNAPSHOT_TIMESTEP = 20 ! No. of Timesteps between snapshots
 
   integer, parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + 1
 
 ! Model parameters
-  real(dp), parameter :: LENGTH = 10000 ! 
+  real(dp), parameter :: RADIUS = 10000 ! 
 
   contains
 !===============================================================================
@@ -47,15 +47,17 @@ module Parameters
   end function rigidity_fn
 
   subroutine Initial_conditions(global_points, displ, vel)
-    real(dp) global_points(:), displ(:), vel(:)
+    real(dp) global_points(NUM_GLOBAL_POINTS), displ(NUM_GLOBAL_POINTS), vel(NUM_GLOBAL_POINTS)
     integer i_displ, i_vel
 
-    do i_displ = 1, size(displ)
-      displ(i_displ) = cos(8 * PI * global_points(i_displ) / LENGTH)
+    do i_displ = 1, NUM_GLOBAL_POINTS
+      displ(i_displ) = exp(-10. * (global_points(i_displ) - global_points(NUM_GLOBAL_POINTS / 2))**2)
     enddo
 
-    do i_vel = 1, size(vel)
-      vel(i_vel) = 0.d0
+    print *, displ
+
+    do i_vel = 1, NUM_GLOBAL_POINTS
+      vel(i_vel) = 0.
     enddo
   end subroutine Initial_conditions
 

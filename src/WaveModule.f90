@@ -32,7 +32,7 @@ module WaveModule
 
     ! Setup anchor points
     do i_spec = 0, NUM_SPEC_EL
-      anchor_points(i_spec) = dble(i_spec) * LENGTH / dble(NUM_SPEC_EL)
+      anchor_points(i_spec) = 2 * PI * dble(i_spec) / dble(NUM_SPEC_EL)
     enddo
 
     do i_spec = 1,NUM_SPEC_EL
@@ -72,7 +72,7 @@ module WaveModule
     real(dp) calculate_delta_t, delta_h, max_vel
     real(dp) :: courant_CFL = 0.4d0 !CFL stability condition
 
-    delta_h = LENGTH / dble(NUM_GLOBAL_POINTS)
+    delta_h = 2 * PI / dble(NUM_GLOBAL_POINTS)
     max_vel = maxval(sqrt(mu / rho))
     calculate_delta_t = courant_CFL * delta_h / max_vel
   end function calculate_delta_t 
@@ -144,28 +144,21 @@ module WaveModule
       accel(1) = boundary_accel
       accel(NUM_GLOBAL_POINTS) = boundary_accel
 
-      ! Fixed BCs
-      ! accel(1) = 0
-      ! accel(NUM_GLOBAL_POINTS) = 0
-
       ! Divide by the mass matrix, which is strictly (i.e. perfectly) diagonal
       accel(:) = accel(:)/mass_mat(:)
       ! `Corrector' update velocity
       vel(:) = vel(:) + delta_t/2 * accel(:)
   end subroutine Increment_system
 
-  function global_to_circle(global_points)
+  function global_to_circle(global_points, radius)
     real(dp) global_points(NUM_GLOBAL_POINTS)
     real(dp) global_to_circle(NUM_GLOBAL_POINTS, 2)
-    real(dp) theta, radius
+    real(dp) radius
     integer i_glob
 
-    radius = LENGTH / (2 * PI)
-
     do i_glob = 1, NUM_GLOBAL_POINTS
-      theta = 2 * PI * global_points(i_glob) / LENGTH
-      global_to_circle(i_glob, 1) = radius * cos(theta)
-      global_to_circle(i_glob, 2) = radius * sin(theta)
+      global_to_circle(i_glob, 1) = radius * cos(global_points(i_glob))
+      global_to_circle(i_glob, 2) = radius * sin(global_points(i_glob))
     enddo
   end function global_to_circle
 
@@ -191,7 +184,7 @@ module WaveModule
     real(dp) circle_points(NUM_GLOBAL_POINTS, 2)
 
     write(snapshot_file, "('snapshot',i5.5)") timestep
-    circle_points = global_to_circle(global_points)
+    circle_points = global_to_circle(global_points, RADIUS)
 
     open(unit=10, file=snapshot_dir//snapshot_file, action="write", status="unknown")
     do i_glob = 1, NUM_GLOBAL_POINTS
