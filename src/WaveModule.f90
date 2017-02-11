@@ -51,7 +51,7 @@ module WaveModule
       enddo
     enddo
 
-  ! Compute global gridpoint position
+    ! Compute global gridpoint position
     do i_spec = 1,NUM_SPEC_EL
       do i_gll = 1,NUM_GLL
         i_glob = i_bool(i_gll,i_spec)
@@ -154,6 +154,21 @@ module WaveModule
       vel(:) = vel(:) + delta_t/2 * accel(:)
   end subroutine Increment_system
 
+  function global_to_circle(global_points)
+    real(dp) global_points(NUM_GLOBAL_POINTS)
+    real(dp) global_to_circle(NUM_GLOBAL_POINTS, 2)
+    real(dp) theta, radius
+    integer i_glob
+
+    radius = LENGTH / (2 * PI)
+
+    do i_glob = 1, NUM_GLOBAL_POINTS
+      theta = 2 * PI * global_points(i_glob) / LENGTH
+      global_to_circle(i_glob, 1) = radius * cos(theta)
+      global_to_circle(i_glob, 2) = radius * sin(theta)
+    enddo
+  end function global_to_circle
+
   subroutine Output_snapshot(snapshot_dir, global_points, displ, timestep)
     character(len=*) snapshot_dir
     real(dp) global_points(:), displ(:)
@@ -167,5 +182,21 @@ module WaveModule
       write(10,*) sngl(global_points(i_glob)),sngl(displ(i_glob))
     enddo
   end subroutine Output_snapshot
+
+  subroutine Output_3d_snapshot(snapshot_dir, global_points, displ, timestep)
+    character(len=*) snapshot_dir
+    real(dp) global_points(NUM_GLOBAL_POINTS), displ(NUM_GLOBAL_POINTS)
+    integer timestep, i_glob
+    character(len=50) snapshot_file
+    real(dp) circle_points(NUM_GLOBAL_POINTS, 2)
+
+    write(snapshot_file, "('snapshot',i5.5)") timestep
+    circle_points = global_to_circle(global_points)
+
+    open(unit=10, file=snapshot_dir//snapshot_file, action="write", status="unknown")
+    do i_glob = 1, NUM_GLOBAL_POINTS
+      write(10,*) sngl(circle_points(i_glob, 1)), sngl(circle_points(i_glob, 2)), sngl(displ(i_glob))
+    enddo
+  end subroutine Output_3d_snapshot
 
 end module WaveModule

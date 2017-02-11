@@ -61,7 +61,7 @@ program OneDimWaveEqn
   do timestep = 1, NUM_TIMESTEPS
     call Increment_system(displ, vel, accel, rho, mu, mass_mat, i_bool, h_prime,&
       gll_weights, jacobian_mat, jacobian, delta_t)
-    if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) call Output_snapshot(OUTPUT_PATH, global_points, displ, timestep)
+    if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) call Output_3d_snapshot(OUTPUT_PATH, global_points, displ, timestep)
   enddo
 
 end program OneDimWaveEqn
