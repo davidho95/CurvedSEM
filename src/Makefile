@@ -13,15 +13,18 @@ FFLAGS =  -I../mod -J../mod -O5           \
 SRCS =  gll_library.f90                               \
         lagrange_poly.f90                             \
         Parameters.f90 \
-        WaveModule.f90
+        OneDimWaveModule.f90 \
+        TwoDimWaveModule.f90
 
 OBJS =	$(LOBJ)gll_library.o                          \
 		$(LOBJ)lagrange_poly.o   \
 		$(LOBJ)Parameters.o \
-		$(LOBJ)WaveModule.o                   \
+		$(LOBJ)OneDimWaveModule.o                   \
+		$(LOBJ)TwoDimWaveModule.o
 
 MODS = $(MOD)Parameters.mod \
-	   $(MOD)WaveModule.mod
+	   $(MOD)OneDimWaveModule.mod \
+	   $(MOD)TwoDimWaveModule.mod
 
 all:    OneDimWaveEqn
 

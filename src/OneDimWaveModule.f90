@@ -1,4 +1,4 @@
-module WaveModule
+module OneDimWaveModule
 
   use Parameters
 
@@ -192,4 +192,4 @@ module WaveModule
     enddo
   end subroutine Output_3d_snapshot
 
-end module WaveModule
+end module OneDimWaveModule

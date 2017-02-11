@@ -33,7 +33,8 @@
 program OneDimWaveEqn
 
   use Parameters
-  use WaveModule
+  use OneDimWaveModule
+  use TwoDimWaveModule
 
   implicit none
 
