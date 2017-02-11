@@ -66,6 +66,17 @@ module WaveModule
 
   end subroutine Setup_mesh
 
+  ! function calculate_delta_t(rho, mu, length)
+  !   real(dp) rho(:), mu(:)
+  !   real(dp) calculate_delta_t, length, delta_h, max_vel
+  !   real(dp) :: courant_CFL = 0.4d0 !CFL stability condition
+
+  !   delta_h = length / dble(NUM_GLOBAL_POINTS)
+  !   max_vel = maxval(sqrt(mu / rho))
+  !   print *, max_vel
+  !   calculate_delta_t = courant_CFL * delta_h / max_vel
+  ! end function calculate_delta_t 
+
   function mass_mat_glob(rho, jacobian, i_bool, gll_weights)
     real(dp) rho(:), jacobian(:, :), gll_weights(:)
     integer i_bool(:, :)
@@ -90,6 +101,7 @@ module WaveModule
     integer i_spec, i_gll, j_gll, k_gll, i_glob
     real(dp) temp(NUM_GLL)
     real(dp) templ
+    real(dp) boundary_displ, boundary_vel, boundary_accel
 
     ! `Predictor' update displacement using explicit finite-difference time scheme (Newmark)
       displ(:) = displ(:) + delta_t * vel(:) + delta_t**2/2 * accel(:)
@@ -122,9 +134,20 @@ module WaveModule
         enddo ! Second loop over the GLL points
       enddo ! End loop over all spectral elements
 
-      ! Fixed BCs for now
-     accel(1) = 0.
-      accel(NUM_GLOBAL_POINTS) = 0.
+      ! Periodic BCs
+      boundary_displ = (displ(1) + displ(NUM_GLOBAL_POINTS)) / 2
+      boundary_vel = (vel(1) + vel(NUM_GLOBAL_POINTS)) / 2
+      boundary_accel = (accel(1) + accel(NUM_GLOBAL_POINTS)) / 2
+      displ(1) = boundary_displ
+      displ(NUM_GLOBAL_POINTS) = boundary_displ
+      vel(1) = boundary_vel
+      vel(NUM_GLOBAL_POINTS) = boundary_vel
+      accel(1) = boundary_accel
+      accel(NUM_GLOBAL_POINTS) = boundary_accel
+
+      ! Fixed BCs
+      ! accel(1) = 0
+      ! accel(NUM_GLOBAL_POINTS) = 0
 
       ! Divide by the mass matrix, which is strictly (i.e. perfectly) diagonal
       accel(:) = accel(:)/mass_mat(:)
@@ -140,7 +163,7 @@ module WaveModule
 
     write(snapshot_file, "('snapshot',i5.5)") timestep
 
-    open(unit=10, file=snapshot_dir//snapshot_file, status="replace")
+    open(unit=10, file=snapshot_dir//snapshot_file, action="write", status="unknown")
     do i_glob = 1, NUM_GLOBAL_POINTS
       write(10,*) sngl(global_points(i_glob)),sngl(displ(i_glob))
     enddo

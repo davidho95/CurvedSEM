@@ -4,6 +4,9 @@ module Parameters
 
   integer, parameter :: dp = kind(1.0d0)
 
+! System parameters
+  character(len = 43) :: output_path = "/home/davidho/WaveEqCurvedSpacetime/output/"
+
 ! Mathematical constants
   real(dp), parameter :: PI = 3.141592653589793d0
 
@@ -11,8 +14,6 @@ module Parameters
   integer, parameter :: NUM_SPEC_EL = 200 ! No. of spectral elements
   integer, parameter :: NUM_GLL = 4 ! No. of Gauss-Lobatto-Legendre points
   integer, parameter :: NUM_TIMESTEPS = 100000 ! No. of time steps to calculate
-  real(dp), parameter :: TOTAL_TIME = 1. ! Total simulation time / s
-  real(dp), parameter :: delta_t = TOTAL_TIME / dble(NUM_TIMESTEPS)
   integer, parameter :: SNAPSHOT_TIMESTEP = 500 ! No. of Timesteps between snapshots
 
   integer, parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + 1
@@ -50,7 +51,7 @@ module Parameters
     integer i_displ, i_vel
 
     do i_displ = 1, size(displ)
-      displ(i_displ) = sin(PI * global_points(i_displ) / LENGTH)
+      displ(i_displ) = cos(8 * PI * global_points(i_displ) / LENGTH)
     enddo
 
     do i_vel = 1, size(vel)
