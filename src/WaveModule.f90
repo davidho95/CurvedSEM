@@ -66,16 +66,16 @@ module WaveModule
 
   end subroutine Setup_mesh
 
-  ! function calculate_delta_t(rho, mu, length)
-  !   real(dp) rho(:), mu(:)
-  !   real(dp) calculate_delta_t, length, delta_h, max_vel
-  !   real(dp) :: courant_CFL = 0.4d0 !CFL stability condition
+  function calculate_delta_t(rho, mu)
+    real(dp) rho(NUM_GLOBAL_POINTS)
+    real(dp) mu(NUM_GLOBAL_POINTS)
+    real(dp) calculate_delta_t, delta_h, max_vel
+    real(dp) :: courant_CFL = 0.4d0 !CFL stability condition
 
-  !   delta_h = length / dble(NUM_GLOBAL_POINTS)
-  !   max_vel = maxval(sqrt(mu / rho))
-  !   print *, max_vel
-  !   calculate_delta_t = courant_CFL * delta_h / max_vel
-  ! end function calculate_delta_t 
+    delta_h = LENGTH / dble(NUM_GLOBAL_POINTS)
+    max_vel = maxval(sqrt(mu / rho))
+    calculate_delta_t = courant_CFL * delta_h / max_vel
+  end function calculate_delta_t 
 
   function mass_mat_glob(rho, jacobian, i_bool, gll_weights)
     real(dp) rho(:), jacobian(:, :), gll_weights(:)
@@ -133,7 +133,6 @@ module WaveModule
           accel(i_glob) = accel(i_glob) - templ
         enddo ! Second loop over the GLL points
       enddo ! End loop over all spectral elements
-
       ! Periodic BCs
       boundary_displ = (displ(1) + displ(NUM_GLOBAL_POINTS)) / 2
       boundary_vel = (vel(1) + vel(NUM_GLOBAL_POINTS)) / 2

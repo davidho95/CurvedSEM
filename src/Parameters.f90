@@ -13,8 +13,8 @@ module Parameters
 ! Simulation parameters
   integer, parameter :: NUM_SPEC_EL = 200 ! No. of spectral elements
   integer, parameter :: NUM_GLL = 4 ! No. of Gauss-Lobatto-Legendre points
-  integer, parameter :: NUM_TIMESTEPS = 100000 ! No. of time steps to calculate
-  integer, parameter :: SNAPSHOT_TIMESTEP = 500 ! No. of Timesteps between snapshots
+  integer, parameter :: NUM_TIMESTEPS = 1000 ! No. of time steps to calculate
+  integer, parameter :: SNAPSHOT_TIMESTEP = 50 ! No. of Timesteps between snapshots
 
   integer, parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + 1
 
