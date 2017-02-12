@@ -14,13 +14,15 @@ SRCS =  gll_library.f90                               \
         lagrange_poly.f90                             \
         Parameters.f90 \
         OneDimWaveModule.f90 \
-        TwoDimWaveModule.f90
+        TwoDimWaveModule.f90 \
+        get_global.f90
 
 OBJS =	$(LOBJ)gll_library.o                          \
 		$(LOBJ)lagrange_poly.o   \
 		$(LOBJ)Parameters.o \
 		$(LOBJ)OneDimWaveModule.o                   \
-		$(LOBJ)TwoDimWaveModule.o
+		$(LOBJ)TwoDimWaveModule.o \
+		$(LOBJ)get_global.o
 
 MODS = $(MOD)Parameters.mod \
 	   $(MOD)OneDimWaveModule.mod \

@@ -54,8 +54,6 @@ module Parameters
       displ(i_displ) = exp(-10. * (global_points(i_displ) - global_points(NUM_GLOBAL_POINTS / 2))**2)
     enddo
 
-    print *, displ
-
     do i_vel = 1, NUM_GLOBAL_POINTS
       vel(i_vel) = 0.
     enddo

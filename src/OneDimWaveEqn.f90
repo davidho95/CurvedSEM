@@ -32,37 +32,39 @@
 !===============================================================================
 program OneDimWaveEqn
 
-  use Parameters
-  use OneDimWaveModule
+  ! use Parameters
+  ! use OneDimWaveModule
   use TwoDimWaveModule
 
   implicit none
 
-  integer, dimension(NUM_GLL, NUM_SPEC_EL) :: i_bool
-  real(dp), dimension(NUM_GLL, NUM_SPEC_EL) :: jacobian_mat, jacobian
-  real(dp), dimension(NUM_GLOBAL_POINTS) :: global_points, rho, mu
-  real(dp), dimension(NUM_GLOBAL_POINTS) :: displ, vel, accel, mass_mat
-  real(dp), dimension(NUM_GLL, NUM_GLL) :: h_prime
-  real(dp), dimension(NUM_GLL) :: gll_weights
-  real(dp) delta_t
+  call Setup_mesh_2d()
 
-! Index variables
-  integer timestep
+!   integer, dimension(NUM_GLL, NUM_SPEC_EL) :: i_bool
+!   real(dp), dimension(NUM_GLL, NUM_SPEC_EL) :: jacobian_mat, jacobian
+!   real(dp), dimension(NUM_GLOBAL_POINTS) :: global_points, rho, mu
+!   real(dp), dimension(NUM_GLOBAL_POINTS) :: displ, vel, accel, mass_mat
+!   real(dp), dimension(NUM_GLL, NUM_GLL) :: h_prime
+!   real(dp), dimension(NUM_GLL) :: gll_weights
+!   real(dp) delta_t
 
-  call Setup_mesh(i_bool, rho, mu, global_points, gll_weights, h_prime, jacobian_mat, jacobian)
+! ! Index variables
+!   integer timestep
 
-  delta_t = calculate_delta_t(rho, mu)
+!   call Setup_mesh(i_bool, rho, mu, global_points, gll_weights, h_prime, jacobian_mat, jacobian)
 
-  mass_mat = mass_mat_glob(rho, jacobian, i_bool, gll_weights)
+!   delta_t = calculate_delta_t(rho, mu)
 
-  accel(:) = 0
+!   mass_mat = mass_mat_glob(rho, jacobian, i_bool, gll_weights)
 
-  call Initial_conditions(global_points, displ, vel)
+!   accel(:) = 0
 
-  do timestep = 1, NUM_TIMESTEPS
-    call Increment_system(displ, vel, accel, rho, mu, mass_mat, i_bool, h_prime,&
-      gll_weights, jacobian_mat, jacobian, delta_t)
-    if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) call Output_3d_snapshot(OUTPUT_PATH, global_points, displ, timestep)
-  enddo
+!   call Initial_conditions(global_points, displ, vel)
+
+!   do timestep = 1, NUM_TIMESTEPS
+!     call Increment_system(displ, vel, accel, rho, mu, mass_mat, i_bool, h_prime,&
+!       gll_weights, jacobian_mat, jacobian, delta_t)
+!     if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) call Output_3d_snapshot(OUTPUT_PATH, global_points, displ, timestep)
+!   enddo
 
 end program OneDimWaveEqn
