@@ -4,8 +4,8 @@ module TwoDimWaveModule
 
   real(dp), parameter :: PI = 3.141592653589793
 
-  integer, dimension(2), parameter :: NUM_SPEC_EL = (/2, 2/)
-  integer, parameter :: NUM_GLL = 3
+  integer, dimension(2), parameter :: NUM_SPEC_EL = (/20, 20/)
+  integer, parameter :: NUM_GLL = 4
   integer, dimension(2), parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + (/1, 1/)
   integer :: total_num_glob
   contains
@@ -23,6 +23,7 @@ module TwoDimWaveModule
     integer, dimension(TOTAL_NUM_NODES) :: locval
     logical, dimension(TOTAL_NUM_NODES) :: ifseg
     real(dp), dimension(:, :), allocatable :: global_points 
+    real(dp), dimension(:, :), allocatable :: torus_points
 
     integer i_gll, j_gll, i_spec, i_spec_x, i_spec_y, i_eoff, i_loc, i_glob
 
@@ -89,6 +90,7 @@ module TwoDimWaveModule
       i_bool,locval,ifseg,total_num_glob,TOTAL_NUM_NODES)
 
     allocate(global_points(total_num_glob, 2))
+    allocate(torus_points(total_num_glob, 3))
 
     do i_spec = 1, TOTAL_NUM_SPEC
       do j_gll = 1, NUM_GLL
@@ -99,10 +101,27 @@ module TwoDimWaveModule
       enddo
     enddo
 
+    torus_points = global_to_torus(global_points, 2d0, 1d0)
+
+    open(unit=10, file="../output/torus", action="write", status="unknown")
     do i_glob = 1, total_num_glob
-      print *, global_points(i_glob, 1), global_points(i_glob, 2)
+      write(10,*) sngl(torus_points(i_glob, 1)), sngl(torus_points(i_glob, 2)), sngl(torus_points(i_glob, 3))
     enddo
 
+
   end subroutine Setup_mesh_2d
+
+  function global_to_torus(global_points, r1, r2)
+    real(dp) global_points(:, :)
+    real(dp) r1, r2
+    integer i_glob
+    real(dp) global_to_torus(total_num_glob, 3)
+
+    do i_glob = 1, total_num_glob
+      global_to_torus(i_glob, 1) = (r1 + r2 * cos(global_points(i_glob, 1))) * cos(global_points(i_glob, 2))
+      global_to_torus(i_glob, 2) = (r1 + r2 * cos(global_points(i_glob, 1))) * sin(global_points(i_glob, 2))
+      global_to_torus(i_glob, 3) = r2 * sin(global_points(i_glob, 1))
+    enddo
+  end function global_to_torus
 
 end module TwoDimWaveModule
