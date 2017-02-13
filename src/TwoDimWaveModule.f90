@@ -5,6 +5,7 @@ module TwoDimWaveModule
   real(dp), parameter :: PI = 3.141592653589793
 
   integer, dimension(2), parameter :: NUM_SPEC_EL = (/20, 20/)
+  integer, parameter :: TOTAL_NUM_SPEC = NUM_SPEC_EL(1) * NUM_SPEC_EL(2)
   integer, parameter :: NUM_GLL = 4
   integer, dimension(2), parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + (/1, 1/)
   integer :: total_num_glob
@@ -15,11 +16,10 @@ module TwoDimWaveModule
     real(dp), dimension(NUM_GLL) :: gll_points, gll_weights
     real(dp), dimension(NUM_GLL, NUM_GLL) :: hprime
 
-    integer, parameter :: TOTAL_NUM_SPEC = NUM_SPEC_EL(1) * NUM_SPEC_EL(2)
     integer, parameter :: TOTAL_NUM_NODES = NUM_GLL * NUM_GLL * TOTAL_NUM_SPEC
     real(dp), dimension(NUM_GLL, NUM_GLL, TOTAL_NUM_SPEC, 2) :: nodes
     integer, dimension(NUM_GLL, NUM_GLL, TOTAL_NUM_SPEC) :: i_bool
-    real(dp), dimension(TOTAL_NUM_NODES) :: temp_points_x, temp_points_y
+    real(dp), dimension(TOTAL_NUM_NODES, 2) :: temp_points
     integer, dimension(TOTAL_NUM_NODES) :: locval
     logical, dimension(TOTAL_NUM_NODES) :: ifseg
     real(dp), dimension(:, :), allocatable :: global_points 
@@ -30,12 +30,12 @@ module TwoDimWaveModule
     ! get the GLL points and weights
     call zwgljd(gll_points,gll_weights,NUM_GLL,0.0_dp,0.0_dp)
     if(mod(NUM_GLL,2) /= 0) gll_points((NUM_GLL-1)/2+1) = 0.0_dp
-    
+
     ! get the derivatives of the Lagrange polynomials at 
-    ! the GLL points; recall that  hprime(i,j)=h'_{j}(gll_points_{i}) 
+    ! the GLL points; recall that  hprime(i,j)=h'_{j}(xigll_{i}) 
     do j_gll=1,NUM_GLL
        do i_gll=1,NUM_GLL
-          hprime(i_gll,j_gll) = lagrange_deriv_GLL(j_gll-1,i_gll-1,gll_points,NUM_GLL)
+          hprime(i,j) = lagrange_deriv_GLL(j_gll-1,i_gll-1,gll_points,NUM_GLL)
        end do
     end do
 
@@ -49,7 +49,7 @@ module TwoDimWaveModule
       enddo
     enddo
 
-    ! Setup global points
+    ! Setup nodes
     i_spec = 0
     do i_spec_x = 1, NUM_SPEC_EL(1)
       do i_spec_y = 1, NUM_SPEC_EL(2)
@@ -77,16 +77,15 @@ module TwoDimWaveModule
        do j_gll = 1,NUM_GLL
           do i_gll = 1,NUM_GLL
              i_loc = i_loc + 1
-             temp_points_x(i_loc+i_eoff) = nodes(i_gll,j_gll,i_spec, 1)
-             temp_points_y(i_loc+i_eoff) = nodes(i_gll, j_gll, i_spec, 2)
-          end do
-       end do
-    end do
+             temp_points(i_loc+i_eoff, :) = nodes(i_gll,j_gll,i_spec, :)
+          enddo
+       enddo
+    enddo
 
     locval = 0.
     ifseg = .FALSE.
 
-    call get_global(NUM_GLL,TOTAL_NUM_SPEC,temp_points_x,temp_points_y,&
+    call get_global(NUM_GLL,TOTAL_NUM_SPEC,temp_points(:, 1),temp_points(:, 2),&
       i_bool,locval,ifseg,total_num_glob,TOTAL_NUM_NODES)
 
     allocate(global_points(total_num_glob, 2))
@@ -108,8 +107,25 @@ module TwoDimWaveModule
       write(10,*) sngl(torus_points(i_glob, 1)), sngl(torus_points(i_glob, 2)), sngl(torus_points(i_glob, 3))
     enddo
 
-
   end subroutine Setup_mesh_2d
+
+  function jacobian(nodes, hprime)
+    integer i_gll, j_gll, k_gll, i_spec
+    real(dp) jacobian(NUM_GLL, NUM_GLL, TOTAL_NUM_SPEC, 2, 2)
+
+    do i_spec = 1, TOTAL_NUM_SPEC
+      do j_gll = 1, NUM_GLL
+        do i_gll = 1, NUM_GLL
+          do k_gll = 1, NUM_GLL
+            jacobian(i_gll, j_gll, i_spec, 1, 1) = nodes(k_gll,j_gll,i_spec, 1)*hprime(i_gll,k_gll)
+            jacobian(i_gll, j_gll, i_spec, 1, 2) = nodes(i_gll,k_gll,i_spec, 1)*hprime(j_gll,k_gll)
+            jacobian(i_gll, j_gll, i_spec, 2, 1) = nodes(k_gll,j_gll,i_spec, 2)*hprime(i_gll,k_gll)
+            jacobian(i_gll, j_gll, i_spec, 2, 2) = nodes(i_gll,k_gll,i_spec, 2)*hprime(j_gll,k_gll)
+          enddo
+        enddo
+      enddo
+    enddo
+  end function
 
   function global_to_torus(global_points, r1, r2)
     real(dp) global_points(:, :)

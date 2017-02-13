@@ -1,4 +1,4 @@
-module Parameters
+module OneDimParameters
 
   implicit none
 
@@ -59,4 +59,4 @@ module Parameters
     enddo
   end subroutine Initial_conditions
 
-end module Parameters
+end module OneDimParameters

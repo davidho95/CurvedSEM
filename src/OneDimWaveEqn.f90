@@ -32,9 +32,8 @@
 !===============================================================================
 program OneDimWaveEqn
 
-  ! use Parameters
-  ! use OneDimWaveModule
-  use TwoDimWaveModule
+  use OneDimParameters
+  use OneDimWaveModule
 
   implicit none
 

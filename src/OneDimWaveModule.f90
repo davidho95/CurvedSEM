@@ -1,6 +1,6 @@
 module OneDimWaveModule
 
-  use Parameters
+  use OneDimParameters
 
   implicit none
 

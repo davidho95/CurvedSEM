@@ -12,19 +12,19 @@ FFLAGS =  -I../mod -J../mod -O5           \
 
 SRCS =  gll_library.f90                               \
         lagrange_poly.f90                             \
-        Parameters.f90 \
+        OneDimParameters.f90 \
         OneDimWaveModule.f90 \
         TwoDimWaveModule.f90 \
         get_global.f90
 
 OBJS =	$(LOBJ)gll_library.o                          \
 		$(LOBJ)lagrange_poly.o   \
-		$(LOBJ)Parameters.o \
+		$(LOBJ)OneDimParameters.o \
 		$(LOBJ)OneDimWaveModule.o                   \
 		$(LOBJ)TwoDimWaveModule.o \
 		$(LOBJ)get_global.o
 
-MODS = $(MOD)Parameters.mod \
+MODS = $(MOD)OneDimParameters.mod \
 	   $(MOD)OneDimWaveModule.mod \
 	   $(MOD)TwoDimWaveModule.mod
 
