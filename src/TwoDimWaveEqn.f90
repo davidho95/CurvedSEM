@@ -32,9 +32,10 @@
 !===============================================================================
 program TwoDimWaveEqn
 
-  use TwoDimWaveEqn
+  use TwoDimWaveModule
 
   implicit none
 
+  call setup_mesh_2d()
 
 end program TwoDimWaveEqn

@@ -28,15 +28,15 @@ MODS = $(MOD)OneDimParameters.mod \
 	   $(MOD)OneDimWaveModule.mod \
 	   $(MOD)TwoDimWaveModule.mod
 
-all:    OneDimWaveEqn
+all:    TwoDimWaveEqn
 
-OneDimWaveEqn: $(BIN)OneDimWaveEqn $(OBJS)
-$(BIN)OneDimWaveEqn: $(OBJS) $(LOBJ)OneDimWaveEqn.o
-	$(F95) $(FFLAGS) $(LOBJ)OneDimWaveEqn.o $(OBJS) -o $(BIN)OneDimWaveEqn
+TwoDimWaveEqn: $(BIN)TwoDimWaveEqn $(OBJS)
+$(BIN)TwoDimWaveEqn: $(OBJS) $(LOBJ)TwoDimWaveEqn.o
+	$(F95) $(FFLAGS) $(LOBJ)TwoDimWaveEqn.o $(OBJS) -o $(BIN)TwoDimWaveEqn
 
-$(LOBJ)OneDimWaveEqn.o: OneDimWaveEqn.f90 
-	$(F95) $(FFLAGS) OneDimWaveEqn.f90 -c
-	$(MV) OneDimWaveEqn.o $(LOBJ)
+$(LOBJ)TwoDimWaveEqn.o: TwoDimWaveEqn.f90 
+	$(F95) $(FFLAGS) TwoDimWaveEqn.f90 -c
+	$(MV) TwoDimWaveEqn.o $(LOBJ)
 
 
 $(OBJS): $(SRCS)	
