@@ -4,9 +4,9 @@ module TwoDimWaveModule
 
   real(dp), parameter :: PI = 3.141592653589793
 
-  integer, dimension(2), parameter :: NUM_SPEC_EL = (/2, 2/)
+  integer, dimension(2), parameter :: NUM_SPEC_EL = (/1, 1/)
   integer, parameter :: TOTAL_NUM_SPEC = NUM_SPEC_EL(1) * NUM_SPEC_EL(2)
-  integer, parameter :: NUM_GLL = 3
+  integer, parameter :: NUM_GLL = 4
   integer, dimension(2), parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + (/1, 1/)
   integer :: total_num_glob
 
@@ -26,7 +26,7 @@ module TwoDimWaveModule
     real(dp), dimension(TOTAL_NUM_NODES, 2) :: temp_points
     integer, dimension(TOTAL_NUM_NODES) :: locval
     logical, dimension(TOTAL_NUM_NODES) :: ifseg
-    real(dp), dimension(NUM_GLL, NUM_GLL, TOTAL_NUM_SPEC, 2, 2) :: metric_tensor
+    real(dp), dimension(NUM_GLL, NUM_GLL, TOTAL_NUM_SPEC, 2, 2) :: metric_tensor, inv_metric
     real(dp), dimension(NUM_GLL, NUM_GLL, TOTAL_NUM_SPEC) :: rho, mu, metric_det
     real(dp), dimension(:, :), allocatable :: global_points
     real(dp), dimension(:, :), allocatable :: torus_points
@@ -106,12 +106,45 @@ module TwoDimWaveModule
 
     allocate(mass_mat(total_num_glob))
 
-    mass_mat = mass_mat_glob(rho, metric_det, i_bool, gll_weights)
-    print *, mass_mat
+    inv_metric(:,:,:,1,1) = metric_tensor(:,:,:,2,2) / metric_det
+    inv_metric(:,:,:,1,2) = -metric_tensor(:,:,:,1,2) / metric_det
+    inv_metric(:,:,:,2,1) = -metric_tensor(:,:,:,2,1) / metric_det
+    inv_metric(:,:,:,2,2) = metric_tensor(:,:,:,1,1) / metric_det
+
+    call increment_system(rho, mu, metric_det, inv_metric, i_bool, hprime, gll_weights)
 
   end subroutine Setup_mesh_2d
 
-  function mass_mat_glob(rho, metric_det, i_bool, gll_weights)
+  subroutine increment_system(rho, mu, metric_det, inv_metric, i_bool, hprime, gll_weights)
+    real(dp) rho(:, :, :), mu(:, :, :), inv_metric(:, :, :, :, :), metric_det(:, :, :)
+    real(dp) hprime(:,:), gll_weights(:)
+    integer i_bool(:, :, :)
+    real(dp), dimension(NUM_GLL, NUM_GLL) :: displ_loc, rho_loc, mu_loc, metric_det_loc
+    real(dp) :: inv_metric_loc(NUM_GLL, NUM_GLL, 2, 2)
+
+    real(dp), dimension(16) :: displ = (/3.7266497013639212d-6,&
+     3.7266497013639212d-6, 3.7266497013639212d-6, 3.7266497013639212d-6,&
+     0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0/)
+
+    integer i_spec, i_gll, j_gll
+
+    do i_spec = 1, TOTAL_NUM_SPEC
+
+      rho_loc = rho(:, :, i_spec)
+      mu_loc = mu(:, :, i_spec)
+      inv_metric_loc = inv_metric(:, :, i_spec, :, :)
+      metric_det_loc = metric_det(:, :, i_spec)
+
+      do i_gll = 1, NUM_GLL
+        do j_gll = 1, NUM_GLL
+          i_glob = i_bool(i_gll, j_gll, i_spec)
+          displ_loc(i_gll, j_gll) = displ(i_glob)
+        enddo
+      enddo
+    enddo
+  end subroutine increment_system
+
+  function mass_mat_glob(rho, metric_det, gll_weights, i_bool)
     real(dp) rho(:, :, :), metric_det(:, :, :), gll_weights(:)
     integer i_bool(:, :, :)
     integer i_spec, i_gll, j_gll, i_glob
@@ -121,15 +154,46 @@ module TwoDimWaveModule
 
     do i_spec = 1,TOTAL_NUM_SPEC
        do i_gll = 1,NUM_GLL
-          do j_ll = 1,NUM_GLL
-             i_glob = i_bool(i_gll,j_ll,i_spec)
-             mass_mat_glob(i_glob) = mass_mat_glob(i_glob) + gll_weights(i_gll)*gll_weights(j_ll) &
-                                     *sqrt(metric_det(i_gll,j_ll,i_spec)) &
-                                     *rho(i_gll,j_ll,i_spec)
+          do j_gll = 1,NUM_GLL
+             i_glob = i_bool(i_gll,j_gll,i_spec)
+             mass_mat_glob(i_glob) = mass_mat_glob(i_glob) + gll_weights(i_gll)*gll_weights(j_gll) &
+                                     *sqrt(metric_det(i_gll,j_gll,i_spec)) &
+                                     *rho(i_gll,j_gll,i_spec)
           enddo
        enddo
     enddo
   end function mass_mat_glob
+
+  function stiffness_mat_loc(u, mu, metric_det, inv_metric, hprime, gll_weights)
+    real(dp), dimension(:, :) :: u, mu, metric_det, hprime
+    real(dp), dimension(:, :, :, :) :: inv_metric
+    real(dp), dimension(:) :: gll_weights
+    real(dp), dimension(NUM_GLL, NUM_GLL, 2) :: derivative_vec, temp
+    real(dp), dimension(NUM_GLL, NUM_GLL) :: temp2, gll_weights_mat
+    integer i_gll, j_gll, k_gll
+
+    real(dp) stiffness_mat_loc(NUM_GLL, NUM_GLL)    
+
+    derivative_vec(:,:,1) = matmul(hprime, u)
+    derivative_vec(:,:,2) = matmul(hprime, u)
+
+    do i_gll = 1, NUM_GLL
+      do j_gll = 1, NUM_GLL
+        temp(i_gll, j_gll, :) = matmul(inv_metric(i_gll,j_gll, :, :), derivative_vec(i_gll, j_gll, :))&
+          * sqrt(metric_det(i_gll, j_gll)) * mu(i_gll, j_gll)
+      enddo
+    enddo
+
+    do i_gll = 1, NUM_GLL
+      do j_gll = 1, NUM_GLL
+        gll_weights_mat(i_gll, j_gll) = gll_weights(i_gll) * gll_weights(j_gll)
+        temp2(i_gll, j_gll) = (temp(i_gll, j_gll, 1) + temp(i_gll, j_gll, 2))*hprime(i_gll, j_gll)
+      enddo
+    enddo
+
+    stiffness_mat_loc = -matmul(gll_weights_mat, temp2) / 2
+
+    end function stiffness_mat_loc
 
   function density_fn(position_vec)
     real(dp) position_vec(2)
@@ -165,23 +229,6 @@ module TwoDimWaveModule
       jacobian(:, :, i_spec, 2, 1) = matmul(hprime, nodes(:, :, i_spec, 2))
       jacobian(:, :, i_spec, 2, 2) = matmul(nodes(:, :, i_spec, 2), transpose(hprime))
     enddo
-
-    ! do i_spec = 1, TOTAL_NUM_SPEC
-    !   do j_gll = 1, NUM_GLL
-    !     do i_gll = 1, NUM_GLL
-    !       do k_gll = 1, NUM_GLL
-    !         jacobian(i_gll, j_gll, i_spec, 1, 1) = jacobian(i_gll, j_gll, i_spec, 1, 1)+&
-    !          nodes(k_gll,j_gll,i_spec, 1)*hprime(i_gll,k_gll)
-    !         jacobian(i_gll, j_gll, i_spec, 1, 2) = jacobian(i_gll, j_gll, i_spec, 1, 2)+&
-    !          nodes(i_gll,k_gll,i_spec, 1)*hprime(j_gll,k_gll)
-    !         jacobian(i_gll, j_gll, i_spec, 2, 1) = jacobian(i_gll, j_gll, i_spec, 2, 1)+&
-    !          nodes(k_gll,j_gll,i_spec, 2)*hprime(i_gll,k_gll)
-    !         jacobian(i_gll, j_gll, i_spec, 2, 2) = jacobian(i_gll, j_gll, i_spec, 2, 2)+&
-    !          nodes(i_gll,k_gll,i_spec, 2)*hprime(j_gll,k_gll)
-    !       enddo
-    !     enddo
-    !   enddo
-    ! enddo
 
     do i_spec = 1, TOTAL_NUM_SPEC
       do i_gll = 1, NUM_GLL
