@@ -34,7 +34,15 @@ module TwoDimWaveModule
 
     real(dp), external :: lagrange_deriv_GLL
 
-    integer i_gll, j_gll, i_spec, i_spec_x, i_spec_y, i_eoff, i_loc, i_glob
+    integer i_gll, j_gll, i_spec, i_spec_x, i_spec_y, i_eoff, i_loc, i_glob, i
+
+    real(dp), dimension(25) :: displ = (/3.7266497013639212d-06,&
+     3.7266497013639212d-06, 3.7266497013639212d-06, 3.7266497013639212d-06,&
+     3.7266497013639212d-06, 6.1019324154531507d-13, 6.1019324154531507d-13,&
+     6.1019324154531507d-13,  6.1019324154531507d-13, 6.1019324154531507d-13,&
+     0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0/)
+
+    real(dp), dimension(25) :: vel, accel
 
     ! get the GLL points and weights
     call zwgljd(gll_points,gll_weights,NUM_GLL,0.0_dp,0.0_dp)
@@ -69,6 +77,10 @@ module TwoDimWaveModule
     metric_tensor = compute_metric(nodes, hprime)
     metric_det(:, :, :) = metric_tensor(:, :, :, 1, 1) * metric_tensor(:, :, :, 2, 2)&
       - metric_tensor(:, :, :, 1, 2) * metric_tensor(:, :, :, 2, 1)
+    inv_metric(:,:,:,1,1) = metric_tensor(:,:,:,2,2) / metric_det
+    inv_metric(:,:,:,1,2) = -metric_tensor(:,:,:,1,2) / metric_det
+    inv_metric(:,:,:,2,1) = -metric_tensor(:,:,:,2,1) / metric_det
+    inv_metric(:,:,:,2,2) = metric_tensor(:,:,:,1,1) / metric_det
 
     do i_spec = 1, TOTAL_NUM_SPEC
        i_eoff = NUM_GLL*NUM_GLL*(i_spec-1)
@@ -97,43 +109,45 @@ module TwoDimWaveModule
         do j_gll = 1, NUM_GLL
         write(10,*) nodes(i_gll, j_gll, i_spec, :),&
           metric_det(i_gll, j_gll, i_spec),&
-          metric_tensor(i_gll, j_gll, i_spec, :, :),&
+          inv_metric(i_gll, j_gll, i_spec, :, :),&
           rho(i_gll, j_gll, i_spec),&
           mu(i_gll, j_gll, i_spec)
         enddo
       enddo
     enddo
 
-    allocate(mass_mat(total_num_glob))
-
-    inv_metric(:,:,:,1,1) = metric_tensor(:,:,:,2,2) / metric_det
-    inv_metric(:,:,:,1,2) = -metric_tensor(:,:,:,1,2) / metric_det
-    inv_metric(:,:,:,2,1) = -metric_tensor(:,:,:,2,1) / metric_det
-    inv_metric(:,:,:,2,2) = metric_tensor(:,:,:,1,1) / metric_det
-
-    call increment_system(rho, mu, metric_det, inv_metric, i_bool, hprime, gll_weights)
-
   end subroutine Setup_mesh_2d
 
-  subroutine increment_system(rho, mu, metric_det, inv_metric, i_bool, hprime, gll_weights)
+  subroutine increment_system(displ, vel, accel, rho, mu, metric_det,&
+    inv_metric, i_bool, hprime, gll_weights, delta_t)
+
+    implicit none
+
     real(dp) rho(:, :, :), mu(:, :, :), inv_metric(:, :, :, :, :), metric_det(:, :, :)
     real(dp) hprime(:,:), gll_weights(:)
     integer i_bool(:, :, :)
-    real(dp), dimension(total_num_glob) :: force_vec
+    real(dp), dimension(total_num_glob) :: displ, vel, accel, force_vec, mass_mat
+    real(dp) delta_t
 
-    real(dp), dimension(25) :: displ = (/3.7266497013639212d-06,&
-       3.7266497013639212d-06, 3.7266497013639212d-06, 3.7266497013639212d-06,&
-       3.7266497013639212d-06, 6.1019324154531507d-13, 6.1019324154531507d-13,&
-       6.1019324154531507d-13,  6.1019324154531507d-13, 6.1019324154531507d-13,&
-       0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0, 0d0/)
+    mass_mat = mass_mat_glob(rho, metric_det, gll_weights, i_bool)
 
-    integer i_spec, i_gll, j_gll
+    ! Use Newmark time-stepping method
+    displ = displ + vel*delta_t + delta_t**2 / 2 * accel
+    vel = vel + accel*delta_t / 2
+    force_vec = force_vector(displ, mu, metric_det,&
+      inv_metric, hprime, gll_weights, i_bool)
+    accel = force_vec / mass_mat
+    vel = vel + accel*delta_t / 2
 
-    force_vec = force_vector(displ, mu, metric_det, inv_metric, hprime, gll_weights, i_bool)
-
+    displ = periodic_bc(displ, i_bool)
+    vel = periodic_bc(vel, i_bool)
+    accel = periodic_bc(accel, i_bool)
   end subroutine increment_system
 
   function mass_mat_glob(rho, metric_det, gll_weights, i_bool)
+
+    implicit none
+
     real(dp) rho(:, :, :), metric_det(:, :, :), gll_weights(:)
     integer i_bool(:, :, :)
     integer i_spec, i_gll, j_gll, i_glob
@@ -154,13 +168,16 @@ module TwoDimWaveModule
   end function mass_mat_glob
 
   function force_vector(u, mu, metric_det, inv_metric, hprime, gll_weights, i_bool)
+
+    implicit none
+
     real(dp), dimension(:, :, :) :: mu, metric_det
     real(dp), dimension(:, :, :, :, :) :: inv_metric
     real(dp), dimension(:) :: gll_weights
     real(dp), dimension(:, :) :: hprime
     real(dp), dimension(NUM_GLL, NUM_GLL, 2) :: derivative_vec, temp
     real(dp), dimension(NUM_GLL, NUM_GLL) :: u_loc, temp2, gll_weights_mat, force_vec_loc
-    integer i_spec, i_gll, j_gll, k_gll
+    integer i_spec, i_gll, j_gll, k_gll, i_glob
     real(dp) u(total_num_glob)
     integer i_bool(:,:,:)
     real(dp) force_vector(total_num_glob)
@@ -203,10 +220,12 @@ module TwoDimWaveModule
         enddo
       enddo
     enddo
-    print *, force_vector
     end function force_vector
 
   function density_fn(position_vec)
+
+    implicit none
+
     real(dp) position_vec(2)
     real(dp) density_fn
     integer i_pos
@@ -215,6 +234,9 @@ module TwoDimWaveModule
   end function density_fn
 
   function rigidity_fn(position_vec)
+
+    implicit none
+
     real(dp) position_vec(2)
     real(dp) rigidity_fn
     integer i_pos
@@ -251,6 +273,34 @@ module TwoDimWaveModule
       enddo
     enddo
   end function compute_metric
+
+  function periodic_bc(vector, i_bool)
+
+    implicit none
+
+    real(dp) vector(:)
+    real(dp) boundary_val
+    integer i_bool(:, :, :)
+    integer i_spec_x, i_spec_y1, i_spec_y2, i_gll, i_glob_y1, i_glob_y2
+    real(dp), dimension(total_num_glob) :: periodic_bc
+
+    periodic_bc = vector
+
+    do i_spec_x = 1, NUM_SPEC_EL(1)
+       i_spec_y1 = (i_spec_x - 1) * NUM_SPEC_EL(2) + 1
+       i_spec_y2 = i_spec_x * NUM_SPEC_EL(2)
+
+       do i_gll = 1,NUM_GLL
+          i_glob_y1 = i_bool(i_gll,1,i_spec_y1)
+          i_glob_y2 = i_bool(i_gll,NUM_GLL,i_spec_y2)
+
+          ! set new u to be average of us on the boundaries
+          boundary_val = (vector(i_glob_y1) + vector(i_glob_y2)) / 2
+          periodic_bc(i_glob_y1) = boundary_val
+          periodic_bc(i_glob_y2) = boundary_val
+       end do
+    end do
+  end function periodic_bc
 
   function nodes_to_torus(nodes, i_bool, r1, r2)
 
