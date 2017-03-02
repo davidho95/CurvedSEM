@@ -4,10 +4,6 @@ module MeshModule
 
   real(dp), parameter :: PI = 3.141592653589793
 
-  !integer, dimension(2), parameter :: NUM_SPEC_EL = (/2,2/)
-  !integer, parameter :: NUM_GLL = 3
-  !integer, dimension(2), parameter :: NUM_GLOBAL_POINTS = NUM_SPEC_EL * (NUM_GLL - 1) + (/1, 1/)
-
   type Mesh
     integer, dimension(2) :: num_spec_el
     integer :: num_gll
@@ -20,16 +16,21 @@ module MeshModule
     integer, allocatable :: i_bool(:, :, :)
     real(dp), allocatable :: gll_weights(:)
     real(dp), allocatable :: hprime(:,:)
+    real(dp), allocatable :: torus_points(:, :)
+    real(dp), allocatable :: torus_normal(:, :)
+    real(dp) :: r1
+    real(dp) :: r2
   end type Mesh
   contains
 
-  subroutine initialise_mesh(this, num_spec_el, num_gll)
+  subroutine initialise_mesh(this, num_spec_el, num_gll, r1, r2)
 
     implicit none
 
     type(Mesh) :: this
     integer, dimension(2) :: num_spec_el
     integer :: num_gll
+    real(dp) r1, r2
 
     real(dp), dimension(num_gll) :: gll_points, gll_weights
     real(dp), dimension(num_gll, num_gll) :: hprime
@@ -50,6 +51,9 @@ module MeshModule
 
     this%num_spec_el = num_spec_el
     this%num_gll = num_gll
+
+    this%r1 = r1
+    this%r2 = r2
 
     allocate(this%nodes(num_gll, num_gll, total_num_spec, 2))
     allocate(this%inv_metric(num_gll, num_gll, total_num_spec, 2, 2))
@@ -95,7 +99,6 @@ module MeshModule
       enddo
     enddo
 
-
     metric_tensor = compute_metric(this%nodes, this%hprime)
 
     this%metric_det(:, :, :) = metric_tensor(:, :, :, 1, 1) * metric_tensor(:, :, :, 2, 2)&
@@ -123,9 +126,11 @@ module MeshModule
     call get_global(NUM_GLL,TOTAL_NUM_SPEC,temp_points(:, 1),temp_points(:, 2),&
       this%i_bool,locval,ifseg,this%total_num_glob,total_num_nodes)
 
-    ! allocate(torus_points(this%total_num_glob, 3))
+    allocate(this%torus_points(this%total_num_glob, 3))
+    allocate(this%torus_normal(this%total_num_glob, 3))
 
-    ! torus_points = nodes_to_torus(nodes, i_bool, 2d0, 1d0)
+    this%torus_points = mesh_to_torus(this)
+    this%torus_normal = calculate_torus_normal(this)
 
   end subroutine initialise_mesh
 
@@ -213,28 +218,66 @@ module MeshModule
 
   end subroutine write_mesh
 
-  ! function nodes_to_torus(nodes, i_bool, r1, r2)
+  function mesh_to_torus(this) result(torus_points)
 
-  !   implicit none
+    implicit none
 
-  !   real(dp) nodes(NUM_GLL, NUM_GLL, TOTAL_NUM_SPEC, 2)
-  !   real(dp) r1, r2
-  !   integer i_bool(NUM_GLL, NUM_GLL, TOTAL_NUM_SPEC) 
-  !   integer i_spec, i_gll, j_gll, i_glob
-  !   real(dp) nodes_to_torus(total_num_glob, 3)
+    type(Mesh) this
+    integer total_num_spec
+    integer i_spec, i_gll, j_gll, i_glob
+    real(dp) :: tangent1(3), tangent2(3), normal(3)
 
-  !   do i_spec = 1, TOTAL_NUM_SPEC
-  !     do j_gll = 1, NUM_GLL
-  !       do i_gll = 1, NUM_GLL
-  !         i_glob = i_bool(i_gll, j_gll, i_spec)
-  !           nodes_to_torus(i_glob, 1) = (r1 + r2 * cos(nodes(i_gll, j_gll, i_spec, 1)))&
-  !            * cos(nodes(i_gll, j_gll, i_spec, 2))
-  !           nodes_to_torus(i_glob, 2) = (r1 + r2 * cos(nodes(i_gll, j_gll, i_spec, 1)))&
-  !            * sin(nodes(i_gll, j_gll, i_spec, 2))
-  !           nodes_to_torus(i_glob, 3) = r2 * sin(nodes(i_gll, j_gll, i_spec, 1))
-  !       enddo
-  !     enddo
-  !   enddo
-  ! end function nodes_to_torus
+    real(dp), allocatable :: torus_points(:, :)
+
+    allocate(torus_points(this%total_num_glob, 3))
+    total_num_spec = this%num_spec_el(1) * this%num_spec_el(2)
+
+    do i_spec = 1, total_num_spec
+      do i_gll = 1, this%num_gll
+        do j_gll = 1, this%num_gll
+          i_glob = this%i_bool(i_gll, j_gll, i_spec)
+            torus_points(i_glob, 1) = (this%r1 + this%r2 * cos(2 * PI * this%nodes(i_gll, j_gll, i_spec, 1)))&
+             * cos(2 * PI * this%nodes(i_gll, j_gll, i_spec, 2))
+            torus_points(i_glob, 2) = (this%r1 + this%r2 * cos(2 * PI * this%nodes(i_gll, j_gll, i_spec, 1)))&
+             * sin(2 * PI * this%nodes(i_gll, j_gll, i_spec, 2))
+            torus_points(i_glob, 3) = this%r2 * sin(2 * PI * this%nodes(i_gll, j_gll, i_spec, 1))
+        enddo
+      enddo
+    enddo
+  end function mesh_to_torus
+
+  function calculate_torus_normal(this) result(normal)
+
+    implicit none
+
+    type(Mesh) this
+    real(dp), allocatable :: normal(:, :)
+    real(dp) :: tangent1(3), tangent2(3)
+    integer total_num_spec
+    integer i_spec, i_gll, j_gll, i_glob
+
+    allocate(normal(this%total_num_glob, 3))
+
+    total_num_spec = this%num_spec_el(1)*this%num_spec_el(2)
+
+    do i_spec = 1, total_num_spec
+      do i_gll = 1, this%num_gll
+        do j_gll = 1, this%num_gll
+          i_glob = this%i_bool(i_gll, j_gll, i_spec)
+          tangent1 = (/-sin(2 * PI * this%nodes(i_gll, j_gll, i_spec, 2)),&
+           cos(2 * PI * this%nodes(i_gll, j_gll, i_spec, 2)), 0d0/)
+          tangent2 = (/-cos(2 * PI * this%nodes(i_gll, j_gll, i_spec, 2))&
+           * sin(2 * PI * this%nodes(i_gll, j_gll, i_spec, 1)),&
+          -sin(2 * PI * this%nodes(i_gll, j_gll, i_spec, 2))&
+           * sin(2 * PI * this%nodes(i_gll, j_gll, i_spec, 1)),&
+           cos(2 * PI * this%nodes(i_gll, j_gll, i_spec, 1))/)
+
+          normal(i_glob, :) = (/tangent1(2)*tangent2(3) - tangent1(3)*tangent2(2),&
+                     tangent1(3)*tangent2(1) - tangent1(1)*tangent2(3),&
+                       tangent1(1)*tangent2(2) - tangent1(2)*tangent2(1)/)
+        enddo
+      enddo
+    enddo
+  end function calculate_torus_normal
 
 end module MeshModule

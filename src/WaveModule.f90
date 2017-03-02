@@ -203,14 +203,35 @@ module WaveModule
       do i_gll = 1, a_mesh%num_gll
         do j_gll = 1, a_mesh%num_gll
           i_glob = a_mesh%i_bool(i_gll, j_gll, i_spec)
-          displ(i_glob) = sin(2 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 1))*&
-           sin(2 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 2))
+          displ(i_glob) = sin(5 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 1))*&
+            cos(7 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 2))
         enddo
       enddo
     enddo
 
+    displ = periodic_bc(displ, a_mesh)
+
     vel = 0d0
     accel = periodic_bc(force_vector(displ, a_mesh) / mass_mat_glob(a_mesh), a_mesh)
   end subroutine initial_conditions
+
+  function displ_on_torus(displ, a_mesh, magnitude) result(coordinates)
+
+    implicit none
+
+    type(Mesh) a_mesh
+    real(dp) displ(:)
+    real(dp) magnitude
+    real(dp), allocatable :: coordinates(:,:)
+    integer i_glob
+
+    allocate(coordinates(a_mesh%total_num_glob, 3))
+
+    do i_glob = 1, a_mesh%total_num_glob
+      coordinates(i_glob, :) = a_mesh%torus_points(i_glob, :) + magnitude&
+       * displ(i_glob) * a_mesh%torus_normal(i_glob, :)
+    enddo
+
+  end function displ_on_torus
 
 end module WaveModule

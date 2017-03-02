@@ -38,18 +38,20 @@ program TwoDimWaveEqn
   implicit none
 
   type(mesh) :: my_mesh
-  real(dp), allocatable :: displ(:), vel(:), accel(:)
+  real(dp), allocatable :: displ(:), vel(:), accel(:), coordinates(:,:)
   real(dp) delta_t
-  integer, parameter :: NUM_TIME_STEPS = 5000
+  integer, parameter :: NUM_TIME_STEPS = 2000
   integer i_step, ispecx, ispecy, ispec, inode, jnode, iglob
   integer :: output_step = 50
 
   character(len=43) :: output_path = "/home/davidho/WaveEqCurvedSpacetime/output/"
   character(len=50) snapshot_file
 
-  call initialise_mesh(my_mesh, (/25, 25/), 3)
+  call initialise_mesh(my_mesh, (/25, 25/), 3, 2d0, 1d0)
 
   call initial_conditions(my_mesh, displ, vel, accel)
+
+  allocate(coordinates(my_mesh%total_num_glob, 3))
 
   delta_t = estimate_timestep(my_mesh)
 
@@ -59,13 +61,15 @@ program TwoDimWaveEqn
       write(snapshot_file, "('snapshot',i5.5)") i_step
       open(unit=10, file=output_path//snapshot_file, action="write", status="unknown")
 
+      coordinates = displ_on_torus(displ, my_mesh, 0.25d0)
+
       do ispecx = 1,my_mesh%num_spec_el(1)
         do inode = 1,my_mesh%num_gll
           do ispecy = 1,my_mesh%num_spec_el(2)
             ispec = (ispecx-1)*my_mesh%num_spec_el(2) + ispecy
             do jnode = 1,my_mesh%num_gll
               iglob = my_mesh%i_bool(inode,jnode,ispec)
-              write(10,*) my_mesh%nodes(inode,jnode,ispec,1),my_mesh%nodes(inode,jnode,ispec,2),displ(iglob),vel(iglob),accel(iglob)
+              write(10,*) coordinates(iglob,1),coordinates(iglob,2),coordinates(iglob,3),vel(iglob),accel(iglob)
             end do
           end do
           write(10,*)
