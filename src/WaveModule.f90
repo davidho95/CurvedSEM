@@ -20,11 +20,11 @@ module WaveModule
     mass_mat = mass_mat_glob(a_mesh)
 
     ! Use Newmark time-stepping method
-    displ = displ + vel*delta_t + delta_t**2 / 2 * accel
-    vel = vel + accel*delta_t / 2
+    displ = displ + vel*delta_t + delta_t**2 / 2d0 * accel
+    vel = vel + accel*delta_t / 2d0
     force_vec = force_vector(displ, a_mesh)
     accel = force_vec / mass_mat
-    vel = vel + accel*delta_t / 2
+    vel = vel + accel*delta_t / 2d0
 
     displ = periodic_bc(displ, a_mesh)
     vel = periodic_bc(vel, a_mesh)
@@ -92,8 +92,8 @@ module WaveModule
         enddo
       enddo
 
-      derivative_vec(:, :, 1) = matmul(a_mesh%hprime, displ_loc) + matmul(displ_loc, transpose(a_mesh%hprime))
-      derivative_vec(:, :, 2) = matmul(a_mesh%hprime, displ_loc) + matmul(displ_loc, transpose(a_mesh%hprime))
+      derivative_vec(:, :, 1) = matmul(a_mesh%hprime, displ_loc) !+ matmul(displ_loc, transpose(a_mesh%hprime))
+      derivative_vec(:, :, 2) =  matmul(displ_loc, transpose(a_mesh%hprime))! + matmul(a_mesh%hprime, displ_loc)
 
       do i_gll = 1, a_mesh%NUM_GLL
         do j_gll = 1, a_mesh%NUM_GLL
@@ -105,12 +105,11 @@ module WaveModule
 
       do i_gll = 1, a_mesh%NUM_GLL
         do j_gll = 1, a_mesh%NUM_GLL
-          gll_weights_mat(i_gll, j_gll) = a_mesh%gll_weights(i_gll) * a_mesh%gll_weights(j_gll)
-          temp2(i_gll, j_gll) = (temp(i_gll, j_gll, 1) + temp(i_gll, j_gll, 2))*a_mesh%hprime(i_gll, j_gll)
+          temp(i_gll, j_gll, :) = a_mesh%gll_weights(i_gll) * a_mesh%gll_weights(j_gll) * temp(i_gll, j_gll, :)
         enddo
       enddo
 
-      force_vec_loc = -transpose(matmul(gll_weights_mat, temp2) / 2)
+      force_vec_loc = -matmul(transpose(a_mesh%hprime), temp(:, :, 1)) - matmul(temp(:, :, 2), a_mesh%hprime)
 
       do i_gll = 1, a_mesh%NUM_GLL
         do j_gll = 1, a_mesh%NUM_GLL
@@ -128,7 +127,7 @@ module WaveModule
     type(Mesh) a_mesh
     integer num_global_points(2)
     real(dp) max_vel, delta_h, delta_t
-    real(dp) :: courant_CFL = 0.4d0
+    real(dp) :: courant_CFL = 0.05d0
 
     num_global_points = (a_mesh%num_gll - 1) * a_mesh%num_spec_el + (/1, 1/)
     delta_h = 1d0 / dble(maxval(num_global_points))
@@ -145,7 +144,9 @@ module WaveModule
     type(Mesh) a_mesh
     real(dp) vector(:)
     real(dp) boundary_val
-    integer i_spec_x, i_spec_y1, i_spec_y2, i_gll, i_glob_y1, i_glob_y2
+    integer i_spec_x, i_spec_y, i_spec_y1, i_spec_y2,&
+     i_spec_x1, i_spec_x2, i_gll, i_glob_y1, i_glob_y2,&
+     i_glob_x1, i_glob_x2, i_glob
     real(dp), allocatable :: periodic_vector(:)
 
     allocate(periodic_vector(a_mesh%total_num_glob))
@@ -156,7 +157,7 @@ module WaveModule
        i_spec_y1 = (i_spec_x - 1) * a_mesh%NUM_SPEC_EL(2) + 1
        i_spec_y2 = i_spec_x * a_mesh%NUM_SPEC_EL(2)
 
-    do i_gll = 1,a_mesh%NUM_GLL
+      do i_gll = 1,a_mesh%NUM_GLL
         i_glob_y1 = a_mesh%i_bool(i_gll,1,i_spec_y1)
         i_glob_y2 = a_mesh%i_bool(i_gll,a_mesh%NUM_GLL,i_spec_y2)
 
@@ -164,6 +165,21 @@ module WaveModule
         boundary_val = (vector(i_glob_y1) + vector(i_glob_y2)) / 2
         periodic_vector(i_glob_y1) = boundary_val
         periodic_vector(i_glob_y2) = boundary_val
+      end do
+    end do
+
+    do i_spec_y = 1, a_mesh%NUM_SPEC_EL(1)
+       i_spec_x1 = i_spec_y
+       i_spec_x2 = a_mesh%NUM_SPEC_EL(1) * (a_mesh%num_spec_el(2) - 1) + i_spec_y
+
+      do i_gll = 1,a_mesh%NUM_GLL
+        i_glob_x1 = a_mesh%i_bool(1,i_gll,i_spec_x1)
+        i_glob_x2 = a_mesh%i_bool(a_mesh%num_gll,i_gll,i_spec_x2)
+
+        ! set new u to be average of us on the boundaries
+        boundary_val = (vector(i_glob_x1) + vector(i_glob_x2)) / 2
+        periodic_vector(i_glob_x1) = boundary_val
+        periodic_vector(i_glob_x2) = boundary_val
       end do
     end do
   end function periodic_bc
@@ -183,17 +199,18 @@ module WaveModule
     allocate(vel(a_mesh%total_num_glob))
     allocate(accel(a_mesh%total_num_glob))
 
-    vel = 1d0
-    accel = 1d0
-
     do i_spec = 1, total_num_spec
       do i_gll = 1, a_mesh%num_gll
         do j_gll = 1, a_mesh%num_gll
           i_glob = a_mesh%i_bool(i_gll, j_gll, i_spec)
-          displ(i_glob) = sin(2 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 1))
+          displ(i_glob) = sin(2 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 1))*&
+           sin(2 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 2))
         enddo
       enddo
     enddo
+
+    vel = 0d0
+    accel = periodic_bc(force_vector(displ, a_mesh) / mass_mat_glob(a_mesh), a_mesh)
   end subroutine initial_conditions
 
 end module WaveModule
