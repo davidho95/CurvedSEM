@@ -92,19 +92,14 @@ module WaveModule
         enddo
       enddo
 
-      derivative_vec(:, :, 1) = matmul(a_mesh%hprime, displ_loc) !+ matmul(displ_loc, transpose(a_mesh%hprime))
-      derivative_vec(:, :, 2) =  matmul(displ_loc, transpose(a_mesh%hprime))! + matmul(a_mesh%hprime, displ_loc)
+      derivative_vec(:, :, 1) = matmul(a_mesh%hprime, displ_loc)
+      derivative_vec(:, :, 2) =  matmul(displ_loc, transpose(a_mesh%hprime))
 
       do i_gll = 1, a_mesh%NUM_GLL
         do j_gll = 1, a_mesh%NUM_GLL
           i_glob = a_mesh%i_bool(i_gll, j_gll, i_spec)
           temp(i_gll, j_gll, :) = matmul(a_mesh%inv_metric(i_gll,j_gll,i_spec, :, :), derivative_vec(i_gll, j_gll, :))&
             * sqrt(a_mesh%metric_det(i_gll, j_gll, i_spec)) * a_mesh%mu(i_gll, j_gll, i_spec)
-        enddo
-      enddo
-
-      do i_gll = 1, a_mesh%NUM_GLL
-        do j_gll = 1, a_mesh%NUM_GLL
           temp(i_gll, j_gll, :) = a_mesh%gll_weights(i_gll) * a_mesh%gll_weights(j_gll) * temp(i_gll, j_gll, :)
         enddo
       enddo
@@ -199,12 +194,16 @@ module WaveModule
     allocate(vel(a_mesh%total_num_glob))
     allocate(accel(a_mesh%total_num_glob))
 
+    displ = 0d0
+
     do i_spec = 1, total_num_spec
       do i_gll = 1, a_mesh%num_gll
         do j_gll = 1, a_mesh%num_gll
           i_glob = a_mesh%i_bool(i_gll, j_gll, i_spec)
-          displ(i_glob) = sin(5 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 1))*&
-            cos(7 * PI * a_mesh%nodes(i_gll, j_gll, i_spec, 2))
+          if (a_mesh%nodes(i_gll, j_gll, i_spec, 1) < 0.1&
+          .and. a_mesh%nodes(i_gll, j_gll, i_spec, 2) < 0.1) then
+            displ(i_glob) = 1d0
+          endif
         enddo
       enddo
     enddo

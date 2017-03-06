@@ -273,8 +273,8 @@ module MeshModule
            cos(2 * PI * this%nodes(i_gll, j_gll, i_spec, 1))/)
 
           normal(i_glob, :) = (/tangent1(2)*tangent2(3) - tangent1(3)*tangent2(2),&
-                     tangent1(3)*tangent2(1) - tangent1(1)*tangent2(3),&
-                       tangent1(1)*tangent2(2) - tangent1(2)*tangent2(1)/)
+                                tangent1(3)*tangent2(1) - tangent1(1)*tangent2(3),&
+                                tangent1(1)*tangent2(2) - tangent1(2)*tangent2(1)/)
         enddo
       enddo
     enddo
