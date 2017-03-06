@@ -3,5 +3,5 @@ touch ./*
 make
 cd ..
 rm output/*
-./bin/OneDimWaveEqn
+./bin/TwoDimWaveEqn
 ./Animate output/*
