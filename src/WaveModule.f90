@@ -200,10 +200,8 @@ module WaveModule
       do i_gll = 1, a_mesh%num_gll
         do j_gll = 1, a_mesh%num_gll
           i_glob = a_mesh%i_bool(i_gll, j_gll, i_spec)
-          if (a_mesh%nodes(i_gll, j_gll, i_spec, 1) < 0.1&
-          .and. a_mesh%nodes(i_gll, j_gll, i_spec, 2) < 0.1) then
-            displ(i_glob) = 1d0
-          endif
+          displ(i_glob) = 5 * exp(-(20*(a_mesh%nodes(i_gll, j_gll, i_spec, 1)-0.5d0))**2&
+            -(20*(a_mesh%nodes(i_gll, j_gll, i_spec, 2)-0.5d0))**2)
         enddo
       enddo
     enddo

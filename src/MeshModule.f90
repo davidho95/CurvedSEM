@@ -99,7 +99,7 @@ module MeshModule
       enddo
     enddo
 
-    metric_tensor = compute_metric(this%nodes, this%hprime)
+    metric_tensor = compute_metric(this)
 
     this%metric_det(:, :, :) = metric_tensor(:, :, :, 1, 1) * metric_tensor(:, :, :, 2, 2)&
       - metric_tensor(:, :, :, 1, 2) * metric_tensor(:, :, :, 2, 1)
@@ -156,41 +156,48 @@ module MeshModule
     rigidity_fn = 1d0
   end function rigidity_fn
 
-  function compute_metric(nodes, hprime) result(metric_tensor)
+  function compute_metric(this) result(metric_tensor)
 
     implicit none
 
+    type(Mesh) this
+
     integer i_gll, j_gll, k_gll, i_spec
-    real(dp) nodes(:, :, :, :)
-    real(dp) hprime(:, :)
-    real(dp), allocatable :: jacobian(:, :, :, :, :)
+    real(dp), allocatable :: theta_eta_jac(:, :, :, :, :), x_theta_jac(:, :, :, :, :), x_eta_jac(:, :, :, :, :)
     real(dp), allocatable :: metric_tensor(:, :, :, :, :)
-    integer, dimension(4) :: nodes_shape 
     integer :: total_num_spec
-    integer :: num_gll
 
-    nodes_shape = shape(nodes)
-    total_num_spec = nodes_shape(3)
-    num_gll = nodes_shape(2)
+    total_num_spec = this%num_spec_el(1) * this%num_spec_el(2)
 
-    allocate(jacobian(num_gll, num_gll, total_num_spec, 2, 2))
-    allocate(metric_tensor(num_gll, num_gll, total_num_spec, 2, 2))
+    allocate(theta_eta_jac(this%num_gll, this%num_gll, total_num_spec, 2, 2))
+    allocate(x_theta_jac(this%num_gll, this%num_gll, total_num_spec, 2, 3))
+    allocate(x_eta_jac(this%num_gll, this%num_gll, total_num_spec, 2, 3))
+    allocate(metric_tensor(this%num_gll, this%num_gll, total_num_spec, 2, 2))
 
-    jacobian = 0d0
+    theta_eta_jac = 0d0
 
-    do i_spec = 1, TOTAL_NUM_SPEC
-      jacobian(:, :, i_spec, 1, 1) = matmul(hprime, nodes(:, :, i_spec, 1))
-      jacobian(:, :, i_spec, 1, 2) = matmul(nodes(:, :, i_spec, 1), transpose(hprime))
-      jacobian(:, :, i_spec, 2, 1) = matmul(hprime, nodes(:, :, i_spec, 2))
-      jacobian(:, :, i_spec, 2, 2) = matmul(nodes(:, :, i_spec, 2), transpose(hprime))
+    do i_spec = 1, total_num_spec
+      theta_eta_jac(:, :, i_spec, 1, 1) = matmul(this%hprime, this%nodes(:, :, i_spec, 1))
+      theta_eta_jac(:, :, i_spec, 1, 2) = matmul(this%nodes(:, :, i_spec, 1), transpose(this%hprime))
+      theta_eta_jac(:, :, i_spec, 2, 1) = matmul(this%hprime, this%nodes(:, :, i_spec, 2))
+      theta_eta_jac(:, :, i_spec, 2, 2) = matmul(this%nodes(:, :, i_spec, 2), transpose(this%hprime))
     enddo
 
-    do i_spec = 1, TOTAL_NUM_SPEC
-      do i_gll = 1, NUM_GLL
-        do j_gll = 1, NUM_GLL
+    x_theta_jac(:, :, :, 1, 1) = -this%r2 * sin(this%nodes(:, :, :, 1)) * cos(this%nodes(:, :, :, 2))
+    x_theta_jac(:, :, :, 2, 1) = -(this%r1 + this%r2 * cos(this%nodes(:, :, :, 1))) * sin(this%nodes(:, :, :, 2))
+    x_theta_jac(:, :, :, 1, 2) = -this%r2 * sin(this%nodes(:, :, :, 1)) * sin(this%nodes(:, :, :, 2))
+    x_theta_jac(:, :, :, 2, 2) = (this%r1 + this%r2 * cos(this%nodes(:, :, :, 1))) * cos(this%nodes(:, :, :, 2))
+    x_theta_jac(:, :, :, 1, 3) = this%r2 * cos(this%nodes(:, :, :, 1))
+    x_theta_jac(:, :, :, 2, 3) = 0d0
+
+    do i_spec = 1, total_num_spec
+      do i_gll = 1, this%num_gll
+        do j_gll = 1, this%num_gll
+          x_eta_jac(i_gll, j_gll, i_spec, :, :) =&
+            matmul(theta_eta_jac(i_gll, j_gll, i_spec, :, :), x_theta_jac(i_gll, j_gll, i_spec, :, :))
           metric_tensor(i_gll, j_gll, i_spec, :, :) =&
-            matmul(transpose(jacobian(i_gll, j_gll, i_spec, :, :)),&
-            jacobian(i_gll, j_gll, i_spec, :, :))
+            matmul(x_eta_jac(i_gll, j_gll, i_spec, :, :),&
+            transpose(x_eta_jac(i_gll, j_gll, i_spec, :, :)))
         enddo
       enddo
     enddo

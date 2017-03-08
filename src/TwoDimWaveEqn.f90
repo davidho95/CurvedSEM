@@ -47,7 +47,7 @@ program TwoDimWaveEqn
   character(len=43) :: output_path = "/home/davidho/WaveEqCurvedSpacetime/output/"
   character(len=50) snapshot_file
 
-  call initialise_mesh(my_mesh, (/50, 50/), 3, 2d0, 1d0)
+  call initialise_mesh(my_mesh, (/25, 25/), 4, 2d0, 1d0)
 
   call initial_conditions(my_mesh, displ, vel, accel)
 
