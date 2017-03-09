@@ -13,7 +13,7 @@ module MeshModule
     real(dp), allocatable :: inv_metric(:, :, :, :, :)
     real(dp), allocatable :: metric_det(:, :, :)
     real(dp), allocatable :: rho(:, :, :)
-    real(dp), allocatable :: mu(:, :, :)
+    real(dp), allocatable :: mu(:, :, :, :, :)
     integer, allocatable :: i_bool(:, :, :)
     real(dp), allocatable :: gll_weights(:)
     real(dp), allocatable :: hprime(:,:)
@@ -61,7 +61,7 @@ module MeshModule
     allocate(this%inv_metric(num_gll, num_gll, this%total_num_spec, 2, 2))
     allocate(this%metric_det(num_gll, num_gll, this%total_num_spec))
     allocate(this%rho(num_gll, num_gll, this%total_num_spec))
-    allocate(this%mu(num_gll, num_gll, this%total_num_spec))
+    allocate(this%mu(num_gll, num_gll, this%total_num_spec, 2, 2))
     allocate(this%i_bool(num_gll, num_gll, this%total_num_spec))
     allocate(this%gll_weights(num_gll))
     allocate(this%hprime(num_gll, num_gll))
@@ -95,7 +95,7 @@ module MeshModule
               this%nodes(i_gll,j_gll,i_spec, 2) =&
                 (dble(i_spec_y) - 0.5_dp + gll_points(j_gll)*0.5_dp)/NUM_SPEC_EL(2)
               this%rho(i_gll,j_gll,i_spec) = density_fn(this%nodes(i_gll, j_gll, i_spec, :))
-              this%mu(i_gll,j_gll,i_spec) = rigidity_fn(this%nodes(i_gll, j_gll, i_spec, :))
+              this%mu(i_gll,j_gll,i_spec, :, :) = rigidity_fn(this%nodes(i_gll, j_gll, i_spec, :))
            enddo
         enddo
       enddo
@@ -139,26 +139,26 @@ module MeshModule
 
   end subroutine initialise_mesh
 
-  function density_fn(position_vec)
+  function density_fn(position_vec) result(density)
 
     implicit none
 
     real(dp) position_vec(2)
-    real(dp) density_fn
-    integer i_pos
+    real(dp) density
 
-    density_fn = 1d0
+    density = 1d0
   end function density_fn
 
-  function rigidity_fn(position_vec)
+  function rigidity_fn(position_vec) result(rigidity)
 
     implicit none
 
     real(dp) position_vec(2)
-    real(dp) rigidity_fn
-    integer i_pos
+    real(dp) rigidity(2, 2)
 
-    rigidity_fn = 1d0
+    rigidity = 0d0
+    rigidity(1,1) = 1d0
+    rigidity(2,2) = 1d0
   end function rigidity_fn
 
   function compute_metric(this) result(metric_tensor)
@@ -217,7 +217,7 @@ module MeshModule
           this%metric_det(i_gll, j_gll, i_spec),&
           this%inv_metric(i_gll, j_gll, i_spec, :, :),&
           this%rho(i_gll, j_gll, i_spec),&
-          this%mu(i_gll, j_gll, i_spec)
+          this%mu(i_gll, j_gll, i_spec, :, :)
         enddo
       enddo
     enddo

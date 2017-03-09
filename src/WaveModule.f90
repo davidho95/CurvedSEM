@@ -91,7 +91,8 @@ module WaveModule
         do j_gll = 1, a_mesh%NUM_GLL
           i_glob = a_mesh%i_bool(i_gll, j_gll, i_spec)
           temp(i_gll, j_gll, :) = matmul(a_mesh%inv_metric(i_gll,j_gll,i_spec, :, :), derivative_vec(i_gll, j_gll, :))&
-            * sqrt(a_mesh%metric_det(i_gll, j_gll, i_spec)) * a_mesh%mu(i_gll, j_gll, i_spec)
+            * sqrt(a_mesh%metric_det(i_gll, j_gll, i_spec))
+          temp(i_gll, j_gll, :) = matmul(a_mesh%mu(i_gll, j_gll, i_spec, :, :), temp(i_gll, j_gll, :))
           temp(i_gll, j_gll, :) = a_mesh%gll_weights(i_gll) * a_mesh%gll_weights(j_gll) * temp(i_gll, j_gll, :)
         enddo
       enddo
@@ -115,10 +116,14 @@ module WaveModule
     integer num_global_points(2)
     real(dp) max_vel, delta_h, delta_t
     real(dp) :: courant_CFL = 0.1d0
+    real(dp), allocatable :: trace_mu(:, :, :)
+
+    allocate(trace_mu(a_mesh%num_gll, a_mesh%num_gll, a_mesh%total_num_spec))
 
     num_global_points = (a_mesh%num_gll - 1) * a_mesh%num_spec_el + (/1, 1/)
     delta_h = 1d0 / dble(maxval(num_global_points))
-    max_vel = maxval(sqrt(a_mesh%mu / a_mesh%rho))
+    trace_mu = a_mesh%mu(:, :, :, 1, 1) + a_mesh%mu(:, :, :, 2, 2)
+    max_vel = maxval(sqrt(trace_mu / a_mesh%rho))
 
     delta_t = courant_CFL * delta_h / max_vel
 
