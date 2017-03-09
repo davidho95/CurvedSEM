@@ -38,7 +38,7 @@ program TwoDimWaveEqn
   implicit none
 
   type(mesh) :: my_mesh
-  real(dp), allocatable :: displ(:), vel(:), accel(:), coordinates(:,:)
+  real(dp), allocatable :: coordinates(:,:)
   real(dp) delta_t
   integer, parameter :: NUM_TIME_STEPS = 5000
   integer i_step, ispecx, ispecy, ispec, inode, jnode, iglob
@@ -49,19 +49,19 @@ program TwoDimWaveEqn
 
   call initialise_mesh(my_mesh, (/25, 25/), 4, 2d0, 1d0)
 
-  call initial_conditions(my_mesh, displ, vel, accel)
+  call initial_conditions(my_mesh)
 
   allocate(coordinates(my_mesh%total_num_glob, 3))
 
   delta_t = estimate_timestep(my_mesh)
 
   do i_step = 1, NUM_TIME_STEPS
-    call increment_system(my_mesh, displ, vel, accel, delta_t)
+    call increment_system(my_mesh, delta_t)
     if (mod(i_step, output_step) == 0) then
       write(snapshot_file, "('snapshot',i5.5)") i_step
       open(unit=10, file=output_path//snapshot_file, action="write", status="unknown")
 
-      coordinates = displ_on_torus(displ, my_mesh, 0.5d0)
+      coordinates = displ_on_torus(my_mesh, 0.5d0)
 
       do ispecx = 1,my_mesh%num_spec_el(1)
         do inode = 1,my_mesh%num_gll
@@ -69,7 +69,8 @@ program TwoDimWaveEqn
             ispec = (ispecx-1)*my_mesh%num_spec_el(2) + ispecy
             do jnode = 1,my_mesh%num_gll
               iglob = my_mesh%i_bool(inode,jnode,ispec)
-              write(10,*) coordinates(iglob,1),coordinates(iglob,2),coordinates(iglob,3),vel(iglob),accel(iglob)
+              write(10,*) coordinates(iglob,1),coordinates(iglob,2),&
+                coordinates(iglob,3),my_mesh%vel(iglob),my_mesh%accel(iglob)
             end do
           end do
           write(10,*)

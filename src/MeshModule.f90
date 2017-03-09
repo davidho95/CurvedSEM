@@ -8,6 +8,7 @@ module MeshModule
     integer, dimension(2) :: num_spec_el
     integer :: num_gll
     integer :: total_num_glob
+    integer :: total_num_spec
     real(dp), allocatable :: nodes(:, :, :, :)
     real(dp), allocatable :: inv_metric(:, :, :, :, :)
     real(dp), allocatable :: metric_det(:, :, :)
@@ -20,6 +21,8 @@ module MeshModule
     real(dp), allocatable :: torus_normal(:, :)
     real(dp) :: r1
     real(dp) :: r2
+
+    real(dp), allocatable :: displ(:), vel(:), accel(:)
   end type Mesh
   contains
 
@@ -34,8 +37,7 @@ module MeshModule
 
     real(dp), dimension(num_gll) :: gll_points, gll_weights
     real(dp), dimension(num_gll, num_gll) :: hprime
-
-    integer :: total_num_spec, total_num_nodes
+    integer :: total_num_nodes
     real(dp), allocatable :: temp_points(:,:)
     integer, allocatable :: locval(:)
     logical, allocatable :: ifseg(:)
@@ -46,28 +48,28 @@ module MeshModule
 
     integer i_gll, j_gll, i_spec, i_spec_x, i_spec_y, i_eoff, i_loc, i_glob
 
-    total_num_spec = num_spec_el(1) * num_spec_el(2)
-    total_num_nodes = num_gll * num_gll * total_num_spec
-
     this%num_spec_el = num_spec_el
+    this%total_num_spec = num_spec_el(1) * num_spec_el(2)
+    total_num_nodes = num_gll * num_gll * this%total_num_spec
+
     this%num_gll = num_gll
 
     this%r1 = r1
     this%r2 = r2
 
-    allocate(this%nodes(num_gll, num_gll, total_num_spec, 2))
-    allocate(this%inv_metric(num_gll, num_gll, total_num_spec, 2, 2))
-    allocate(this%metric_det(num_gll, num_gll, total_num_spec))
-    allocate(this%rho(num_gll, num_gll, total_num_spec))
-    allocate(this%mu(num_gll, num_gll, total_num_spec))
-    allocate(this%i_bool(num_gll, num_gll, total_num_spec))
+    allocate(this%nodes(num_gll, num_gll, this%total_num_spec, 2))
+    allocate(this%inv_metric(num_gll, num_gll, this%total_num_spec, 2, 2))
+    allocate(this%metric_det(num_gll, num_gll, this%total_num_spec))
+    allocate(this%rho(num_gll, num_gll, this%total_num_spec))
+    allocate(this%mu(num_gll, num_gll, this%total_num_spec))
+    allocate(this%i_bool(num_gll, num_gll, this%total_num_spec))
     allocate(this%gll_weights(num_gll))
     allocate(this%hprime(num_gll, num_gll))
 
     allocate(temp_points(total_num_nodes, 2))
     allocate(locval(total_num_nodes))
     allocate(ifseg(total_num_nodes))
-    allocate(metric_tensor(num_gll, num_gll, total_num_spec, 2, 2))
+    allocate(metric_tensor(num_gll, num_gll, this%total_num_spec, 2, 2))
 
     ! get the GLL points and weights
     call zwgljd(gll_points,this%gll_weights,NUM_GLL,0.0_dp,0.0_dp)
@@ -109,7 +111,7 @@ module MeshModule
     this%inv_metric(:,:,:,2,1) = -metric_tensor(:,:,:,2,1) / this%metric_det
     this%inv_metric(:,:,:,2,2) = metric_tensor(:,:,:,1,1) / this%metric_det
 
-    do i_spec = 1, TOTAL_NUM_SPEC
+    do i_spec = 1, this%TOTAL_NUM_SPEC
        i_eoff = NUM_GLL*NUM_GLL*(i_spec-1)
        i_loc = 0
        do j_gll = 1,NUM_GLL
@@ -123,9 +125,12 @@ module MeshModule
     locval = 0.
     ifseg = .FALSE.
 
-    call get_global(NUM_GLL,TOTAL_NUM_SPEC,temp_points(:, 1),temp_points(:, 2),&
+    call get_global(NUM_GLL,this%TOTAL_NUM_SPEC,temp_points(:, 1),temp_points(:, 2),&
       this%i_bool,locval,ifseg,this%total_num_glob,total_num_nodes)
 
+    allocate(this%displ(this%total_num_glob))
+    allocate(this%vel(this%total_num_glob))
+    allocate(this%accel(this%total_num_glob))
     allocate(this%torus_points(this%total_num_glob, 3))
     allocate(this%torus_normal(this%total_num_glob, 3))
 
@@ -165,18 +170,15 @@ module MeshModule
     integer i_gll, j_gll, k_gll, i_spec
     real(dp), allocatable :: theta_eta_jac(:, :, :, :, :), x_theta_jac(:, :, :, :, :), x_eta_jac(:, :, :, :, :)
     real(dp), allocatable :: metric_tensor(:, :, :, :, :)
-    integer :: total_num_spec
 
-    total_num_spec = this%num_spec_el(1) * this%num_spec_el(2)
-
-    allocate(theta_eta_jac(this%num_gll, this%num_gll, total_num_spec, 2, 2))
-    allocate(x_theta_jac(this%num_gll, this%num_gll, total_num_spec, 2, 3))
-    allocate(x_eta_jac(this%num_gll, this%num_gll, total_num_spec, 2, 3))
-    allocate(metric_tensor(this%num_gll, this%num_gll, total_num_spec, 2, 2))
+    allocate(theta_eta_jac(this%num_gll, this%num_gll, this%total_num_spec, 2, 2))
+    allocate(x_theta_jac(this%num_gll, this%num_gll, this%total_num_spec, 2, 3))
+    allocate(x_eta_jac(this%num_gll, this%num_gll, this%total_num_spec, 2, 3))
+    allocate(metric_tensor(this%num_gll, this%num_gll, this%total_num_spec, 2, 2))
 
     theta_eta_jac = 0d0
 
-    do i_spec = 1, total_num_spec
+    do i_spec = 1, this%total_num_spec
       theta_eta_jac(:, :, i_spec, 1, 1) = matmul(this%hprime, this%nodes(:, :, i_spec, 1))
       theta_eta_jac(:, :, i_spec, 1, 2) = matmul(this%nodes(:, :, i_spec, 1), transpose(this%hprime))
       theta_eta_jac(:, :, i_spec, 2, 1) = matmul(this%hprime, this%nodes(:, :, i_spec, 2))
@@ -190,7 +192,7 @@ module MeshModule
     x_theta_jac(:, :, :, 1, 3) = this%r2 * cos(this%nodes(:, :, :, 1))
     x_theta_jac(:, :, :, 2, 3) = 0d0
 
-    do i_spec = 1, total_num_spec
+    do i_spec = 1, this%total_num_spec
       do i_gll = 1, this%num_gll
         do j_gll = 1, this%num_gll
           x_eta_jac(i_gll, j_gll, i_spec, :, :) =&
@@ -206,12 +208,9 @@ module MeshModule
   subroutine write_mesh(this)
     type(Mesh) :: this
     character(len=43) :: output_path = "/home/davidho/WaveEqCurvedSpacetime/output/"
-    integer :: total_num_spec
-
-    total_num_spec = this%num_spec_el(1) * this%num_spec_el(2)
 
     open(unit=10, file=output_path//"mesh.in", action="write", status="unknown")
-    do i_spec = 1, total_num_spec
+    do i_spec = 1, this%total_num_spec
       do i_gll = 1, this%num_gll
         do j_gll = 1, this%num_gll
         write(10,*) this%nodes(i_gll, j_gll, i_spec, :),&
@@ -230,16 +229,14 @@ module MeshModule
     implicit none
 
     type(Mesh) this
-    integer total_num_spec
     integer i_spec, i_gll, j_gll, i_glob
     real(dp) :: tangent1(3), tangent2(3), normal(3)
 
     real(dp), allocatable :: torus_points(:, :)
 
     allocate(torus_points(this%total_num_glob, 3))
-    total_num_spec = this%num_spec_el(1) * this%num_spec_el(2)
 
-    do i_spec = 1, total_num_spec
+    do i_spec = 1, this%total_num_spec
       do i_gll = 1, this%num_gll
         do j_gll = 1, this%num_gll
           i_glob = this%i_bool(i_gll, j_gll, i_spec)
@@ -260,14 +257,11 @@ module MeshModule
     type(Mesh) this
     real(dp), allocatable :: normal(:, :)
     real(dp) :: tangent1(3), tangent2(3)
-    integer total_num_spec
     integer i_spec, i_gll, j_gll, i_glob
 
     allocate(normal(this%total_num_glob, 3))
 
-    total_num_spec = this%num_spec_el(1)*this%num_spec_el(2)
-
-    do i_spec = 1, total_num_spec
+    do i_spec = 1, this%total_num_spec
       do i_gll = 1, this%num_gll
         do j_gll = 1, this%num_gll
           i_glob = this%i_bool(i_gll, j_gll, i_spec)

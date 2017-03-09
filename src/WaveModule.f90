@@ -4,31 +4,30 @@ module WaveModule
 
   contains
 
-  subroutine increment_system(a_mesh, displ, vel, accel, delta_t)
+  subroutine increment_system(a_mesh, delta_t)
 
     implicit none
 
     type(Mesh) :: a_mesh
-    real(dp) displ(:), vel(:), accel(:)
     real(dp) delta_t
 
     real(dp), allocatable :: force_vec(:), mass_mat(:)
 
-    allocate(force_vec(size(accel)))
-    allocate(mass_mat(size(accel)))
+    allocate(force_vec(a_mesh%total_num_glob))
+    allocate(mass_mat(a_mesh%total_num_glob))
 
     mass_mat = mass_mat_glob(a_mesh)
 
     ! Use Newmark time-stepping method
-    displ = displ + vel*delta_t + delta_t**2 / 2d0 * accel
-    vel = vel + accel*delta_t / 2d0
-    force_vec = force_vector(displ, a_mesh)
-    accel = force_vec / mass_mat
-    vel = vel + accel*delta_t / 2d0
+    a_mesh%displ = a_mesh%displ + a_mesh%vel*delta_t + delta_t**2 / 2d0 * a_mesh%accel
+    a_mesh%vel = a_mesh%vel + a_mesh%accel*delta_t / 2d0
+    force_vec = force_vector(a_mesh)
+    a_mesh%accel = force_vec / mass_mat
+    a_mesh%vel = a_mesh%vel + a_mesh%accel*delta_t / 2d0
 
-    displ = periodic_bc(displ, a_mesh)
-    vel = periodic_bc(vel, a_mesh)
-    accel = periodic_bc(accel, a_mesh)
+    a_mesh%displ = periodic_bc(a_mesh%displ, a_mesh)
+    a_mesh%vel = periodic_bc(a_mesh%vel, a_mesh)
+    a_mesh%accel = periodic_bc(a_mesh%accel, a_mesh)
   end subroutine increment_system
 
   function mass_mat_glob(a_mesh) result(mass_mat)
@@ -36,17 +35,14 @@ module WaveModule
     implicit none
 
     type(mesh) a_mesh
-    integer total_num_spec
     integer i_spec, i_gll, j_gll, i_glob
     real(dp), allocatable :: mass_mat(:)
-
-    total_num_spec = a_mesh%num_spec_el(1) * a_mesh%num_spec_el(2)
 
     allocate(mass_mat(a_mesh%total_num_glob))
 
     mass_mat(:) = 0d0
 
-    do i_spec = 1,TOTAL_NUM_SPEC
+    do i_spec = 1,a_mesh%total_num_spec
        do i_gll = 1,a_mesh%NUM_GLL
           do j_gll = 1,a_mesh%NUM_GLL
              i_glob = a_mesh%i_bool(i_gll,j_gll,i_spec)
@@ -58,20 +54,16 @@ module WaveModule
     enddo
   end function mass_mat_glob
 
-  function force_vector(displ, a_mesh)
+  function force_vector(a_mesh)
 
     implicit none
 
     type(Mesh) a_mesh
-    real(dp) displ(:)
     real(dp), allocatable, dimension(:, :, :) :: derivative_vec, temp
     real(dp), allocatable, dimension(:, :) :: displ_loc, temp2, gll_weights_mat, force_vec_loc
-    integer total_num_spec
 
     integer i_spec, i_gll, j_gll, k_gll, i_glob
     real(dp), allocatable :: force_vector(:)
-
-    total_num_spec = a_mesh%num_spec_el(1) * a_mesh%num_spec_el(2)
 
     allocate(derivative_vec(a_mesh%num_gll, a_mesh%num_gll, 2))
     allocate(temp(a_mesh%num_gll, a_mesh%num_gll, 2))
@@ -83,12 +75,12 @@ module WaveModule
 
     force_vector = 0d0
 
-    do i_spec = 1, TOTAL_NUM_SPEC
+    do i_spec = 1, a_mesh%total_num_spec
 
       do i_gll = 1, a_mesh%NUM_GLL
         do j_gll = 1, a_mesh%NUM_GLL
           i_glob = a_mesh%i_bool(i_gll, j_gll, i_spec)
-          displ_loc(i_gll, j_gll) = displ(i_glob)
+          displ_loc(i_gll, j_gll) = a_mesh%displ(i_glob)
         enddo
       enddo
 
@@ -122,7 +114,7 @@ module WaveModule
     type(Mesh) a_mesh
     integer num_global_points(2)
     real(dp) max_vel, delta_h, delta_t
-    real(dp) :: courant_CFL = 0.05d0
+    real(dp) :: courant_CFL = 0.1d0
 
     num_global_points = (a_mesh%num_gll - 1) * a_mesh%num_spec_el + (/1, 1/)
     delta_h = 1d0 / dble(maxval(num_global_points))
@@ -179,45 +171,36 @@ module WaveModule
     end do
   end function periodic_bc
 
-  subroutine initial_conditions(a_mesh, displ, vel, accel)
+  subroutine initial_conditions(a_mesh)
 
     implicit none
 
     type(Mesh) a_mesh
-    real(dp), allocatable :: displ(:), vel(:), accel(:)
-    integer total_num_spec
     integer i_spec, i_gll, j_gll, i_glob
 
-    total_num_spec = a_mesh%num_spec_el(1) * a_mesh%num_spec_el(2)
+    a_mesh%displ = 0d0
 
-    allocate(displ(a_mesh%total_num_glob))
-    allocate(vel(a_mesh%total_num_glob))
-    allocate(accel(a_mesh%total_num_glob))
-
-    displ = 0d0
-
-    do i_spec = 1, total_num_spec
+    do i_spec = 1, a_mesh%total_num_spec
       do i_gll = 1, a_mesh%num_gll
         do j_gll = 1, a_mesh%num_gll
           i_glob = a_mesh%i_bool(i_gll, j_gll, i_spec)
-          displ(i_glob) = 5 * exp(-(20*(a_mesh%nodes(i_gll, j_gll, i_spec, 1)-0.5d0))**2&
+          a_mesh%displ(i_glob) = 5 * exp(-(20*(a_mesh%nodes(i_gll, j_gll, i_spec, 1)-0.5d0))**2&
             -(20*(a_mesh%nodes(i_gll, j_gll, i_spec, 2)-0.5d0))**2)
         enddo
       enddo
     enddo
 
-    displ = periodic_bc(displ, a_mesh)
+    a_mesh%displ = periodic_bc(a_mesh%displ, a_mesh)
 
-    vel = 0d0
-    accel = periodic_bc(force_vector(displ, a_mesh) / mass_mat_glob(a_mesh), a_mesh)
+    a_mesh%vel = 0d0
+    a_mesh%accel = periodic_bc(force_vector(a_mesh) / mass_mat_glob(a_mesh), a_mesh)
   end subroutine initial_conditions
 
-  function displ_on_torus(displ, a_mesh, magnitude) result(coordinates)
+  function displ_on_torus(a_mesh, magnitude) result(coordinates)
 
     implicit none
 
     type(Mesh) a_mesh
-    real(dp) displ(:)
     real(dp) magnitude
     real(dp), allocatable :: coordinates(:,:)
     integer i_glob
@@ -226,7 +209,7 @@ module WaveModule
 
     do i_glob = 1, a_mesh%total_num_glob
       coordinates(i_glob, :) = a_mesh%torus_points(i_glob, :) + magnitude&
-       * displ(i_glob) * a_mesh%torus_normal(i_glob, :)
+       * a_mesh%displ(i_glob) * a_mesh%torus_normal(i_glob, :)
     enddo
 
   end function displ_on_torus
