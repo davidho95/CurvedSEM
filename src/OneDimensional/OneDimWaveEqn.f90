@@ -32,36 +32,35 @@
 !===============================================================================
 program OneDimWaveEqn
 
-  use OneDimParameters
   use OneDimWaveModule
 
   implicit none
 
-  integer, dimension(NUM_GLL, NUM_SPEC_EL) :: i_bool
-  real(dp), dimension(NUM_GLL, NUM_SPEC_EL) :: jacobian_mat, jacobian
-  real(dp), dimension(NUM_GLOBAL_POINTS) :: global_points, rho, mu
-  real(dp), dimension(NUM_GLOBAL_POINTS) :: displ, vel, accel, mass_mat
-  real(dp), dimension(NUM_GLL, NUM_GLL) :: h_prime
-  real(dp), dimension(NUM_GLL) :: gll_weights
+  type(Mesh) my_mesh
   real(dp) delta_t
+  integer :: num_spec_el = 50 ! No. of spectral elements
+  integer :: num_gll = 4 ! No. of Gauss-Lobatto-Legendre points
+  integer :: num_timesteps = 20000 ! No. of time steps to calculate
+  integer :: snapshot_timestep = 200 ! No. of Timesteps between snapshots
+
+! Model parameters
+  real(dp) :: radius = 1d0 ! 
+
 
 ! Index variables
   integer timestep
 
-  call Setup_mesh(i_bool, rho, mu, global_points, gll_weights, h_prime, jacobian_mat, jacobian)
+  call Setup_mesh(my_mesh, num_spec_el, num_gll, radius)
 
-  delta_t = calculate_delta_t(rho, mu)
+  delta_t = calculate_delta_t(my_mesh)
 
-  mass_mat = mass_mat_glob(rho, jacobian, i_bool, gll_weights)
+  print *, delta_t
 
-  accel(:) = 0
-
-  call Initial_conditions(global_points, displ, vel)
+  call Initial_conditions(my_mesh)
 
   do timestep = 1, NUM_TIMESTEPS
-    call Increment_system(displ, vel, accel, rho, mu, mass_mat, i_bool, h_prime,&
-      gll_weights, jacobian_mat, jacobian, delta_t)
-    if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) call Output_3d_snapshot(OUTPUT_PATH, global_points, displ, timestep)
+    call Increment_system(my_mesh, 10*delta_t)
+    if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) call Output_3d_snapshot(OUTPUT_PATH, my_mesh, timestep)
   enddo
 
 end program OneDimWaveEqn
