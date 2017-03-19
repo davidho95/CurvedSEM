@@ -104,8 +104,8 @@ module OneDimWaveModule
     enddo
 
     ! Set mesh properties
-    this%rho = density_fn(this%global_points)
-    this%mu = rigidity_fn(this%global_points)
+    call set_density(this)
+    call set_rigidity(this)
 
     this%mass_mat = mass_mat_glob(this)
 
@@ -222,26 +222,22 @@ module OneDimWaveModule
 !===============================================================================
 ! Function to determine the density on gridpoints
 !===============================================================================
-  function density_fn(mesh)
-    real(dp) mesh(:)
-    real(dp) density_fn(size(mesh))
-    integer i_mesh
-    do i_mesh = 1, size(mesh)
-      density_fn(i_mesh) = 1d0
-    enddo
-  end function density_fn
+  subroutine set_density(this)
+    type(Mesh) this
+    integer i_glob
+
+    this%rho(:) = 1d0 + 10*this%global_points
+  end subroutine set_density
 
 !===============================================================================
 ! Function to determine the rigidity on gridpoints
 !===============================================================================
-  function rigidity_fn(mesh)
-    real(dp) mesh(:)
-    real(dp) rigidity_fn(size(mesh))
-    integer i_mesh
-    do i_mesh = 1, size(mesh)
-      rigidity_fn(i_mesh) = 1d0
-    enddo
-  end function rigidity_fn
+  subroutine set_rigidity(this)
+    type(Mesh) this
+    integer i_glob
+
+    this%mu = 1d0 / (1d0 + 10*this%global_points)
+  end subroutine set_rigidity
 
   subroutine Initial_conditions(this)
     type(Mesh) :: this
@@ -255,5 +251,31 @@ module OneDimWaveModule
       this%vel(i_vel) = 0.
     enddo
   end subroutine Initial_conditions
+
+  function calculate_energy(this) result(energy)
+    type(Mesh) :: this
+    real(dp), allocatable :: PE_density(:), KE_density(:), delta_h(:)
+    real(dp) :: energy
+    integer i_glob
+
+    allocate(PE_density(this%num_global_points))
+    allocate(KE_density(this%num_global_points))
+    allocate(delta_h(this%num_global_points))
+
+    delta_h = 2 * PI * this%r / dble(this%num_global_points)
+
+    KE_density(:) = 0.5d0 * this%rho(:) * this%vel(:)**2
+
+    delta_h(1) = 2 * PI * this%r * (this%global_points(1) - this%global_points(this%num_global_points))
+    PE_density(1) = 0.5d0 * this%mu(1) * &
+      ((this%displ(1) - this%displ(this%num_global_points)) / delta_h(1))**2
+    do i_glob = 2, this%num_global_points
+      delta_h(i_glob) = 2 * PI * this%r * (this%global_points(i_glob) - this%global_points(i_glob - 1))
+      PE_density(i_glob) = 0.5d0 * this%mu(i_glob) * &
+        ((this%displ(i_glob) - this%displ(i_glob - 1)) / delta_h(i_glob))**2
+    enddo
+
+    energy = dot_product(delta_h, KE_density + PE_density)
+  end function calculate_energy
 
 end module OneDimWaveModule
