@@ -40,9 +40,9 @@ program TwoDimWaveEqn
   type(mesh) :: my_mesh
   real(dp), allocatable :: coordinates(:,:)
   real(dp) delta_t
-  integer, parameter :: NUM_TIME_STEPS = 5000
-  integer i_step, ispecx, ispecy, ispec, inode, jnode, iglob
-  integer :: output_step = 50
+  integer, parameter :: NUM_TIME_STEPS = 10000
+  integer i_step, i_spec_x, i_spec_y, i_spec, i_gll, j_gll, iglob
+  integer :: output_step = 100
 
   character(len=43) :: output_path = "/home/davidho/WaveEqCurvedSpacetime/output/"
   character(len=50) snapshot_file
@@ -63,12 +63,12 @@ program TwoDimWaveEqn
 
       coordinates = displ_on_torus(my_mesh, 0.5d0)
 
-      do ispecx = 1,my_mesh%num_spec_el(1)
-        do inode = 1,my_mesh%num_gll
-          do ispecy = 1,my_mesh%num_spec_el(2)
-            ispec = (ispecx-1)*my_mesh%num_spec_el(2) + ispecy
-            do jnode = 1,my_mesh%num_gll
-              iglob = my_mesh%i_bool(inode,jnode,ispec)
+      do i_spec_x = 1,my_mesh%num_spec_el(1)
+        do i_gll = 1,my_mesh%num_gll
+          do i_spec_y = 1,my_mesh%num_spec_el(2)
+            i_spec = (i_spec_x-1)*my_mesh%num_spec_el(2) + i_spec_y
+            do j_gll = 1,my_mesh%num_gll
+              iglob = my_mesh%i_bool(i_gll,j_gll,i_spec)
               write(10,*) coordinates(iglob,1),coordinates(iglob,2),&
                 coordinates(iglob,3),my_mesh%vel(iglob),my_mesh%accel(iglob)
             end do

@@ -1,5 +1,7 @@
 module MeshModule
 
+  implicit none
+
   integer, parameter :: dp = kind(1.0d0)
 
   real(dp), parameter :: PI = 3.141592653589793
@@ -35,7 +37,7 @@ module MeshModule
     integer :: num_gll
     real(dp) r1, r2
 
-    real(dp), dimension(num_gll) :: gll_points, gll_weights
+    real(dp), dimension(num_gll) :: gll_points
     real(dp), dimension(num_gll, num_gll) :: hprime
     integer :: total_num_nodes
     real(dp), allocatable :: temp_points(:,:)
@@ -157,8 +159,9 @@ module MeshModule
     real(dp) rigidity(2, 2)
 
     rigidity = 0d0
-    rigidity(1,1) = 1d0
-    rigidity(2,2) = 1d0
+
+    rigidity(1, 1) = 1d0
+    rigidity(2, 2) = 1d0
   end function rigidity_fn
 
   function compute_metric(this) result(metric_tensor)
@@ -185,11 +188,11 @@ module MeshModule
       theta_eta_jac(:, :, i_spec, 2, 2) = matmul(this%nodes(:, :, i_spec, 2), transpose(this%hprime))
     enddo
 
-    x_theta_jac(:, :, :, 1, 1) = -this%r2 * sin(this%nodes(:, :, :, 1)) * cos(this%nodes(:, :, :, 2))
-    x_theta_jac(:, :, :, 2, 1) = -(this%r1 + this%r2 * cos(this%nodes(:, :, :, 1))) * sin(this%nodes(:, :, :, 2))
-    x_theta_jac(:, :, :, 1, 2) = -this%r2 * sin(this%nodes(:, :, :, 1)) * sin(this%nodes(:, :, :, 2))
-    x_theta_jac(:, :, :, 2, 2) = (this%r1 + this%r2 * cos(this%nodes(:, :, :, 1))) * cos(this%nodes(:, :, :, 2))
-    x_theta_jac(:, :, :, 1, 3) = this%r2 * cos(this%nodes(:, :, :, 1))
+    x_theta_jac(:, :, :, 1, 1) = -this%r2 * sin(2 * PI * this%nodes(:, :, :, 1)) * cos(2 * PI * this%nodes(:, :, :, 2))
+    x_theta_jac(:, :, :, 2, 1) = -(this%r1 + this%r2 * cos(2 * PI * this%nodes(:, :, :, 1))) * sin(2 * PI * this%nodes(:, :, :, 2))
+    x_theta_jac(:, :, :, 1, 2) = -this%r2 * sin(2 * PI * this%nodes(:, :, :, 1)) * sin(2 * PI * this%nodes(:, :, :, 2))
+    x_theta_jac(:, :, :, 2, 2) = (this%r1 + this%r2 * cos(2 * PI * this%nodes(:, :, :, 1))) * cos(2 * PI * this%nodes(:, :, :, 2))
+    x_theta_jac(:, :, :, 1, 3) = this%r2 * cos(2 * PI * this%nodes(:, :, :, 1))
     x_theta_jac(:, :, :, 2, 3) = 0d0
 
     do i_spec = 1, this%total_num_spec
