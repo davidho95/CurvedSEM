@@ -40,8 +40,10 @@ program OneDimWaveEqn
   real(dp) delta_t
   integer :: num_spec_el = 50 ! No. of spectral elements
   integer :: num_gll = 4 ! No. of Gauss-Lobatto-Legendre points
-  integer :: num_timesteps = 10000 ! No. of time steps to calculate
-  integer :: snapshot_timestep = 50 ! No. of Timesteps between snapshots
+  integer :: num_timesteps = 4000 ! No. of time steps to calculate
+  integer :: snapshot_timestep = 40 ! No. of Timesteps between snapshots
+
+  integer i_spec, i_gll, i_glob
 
 ! Model parameters
   real(dp) :: radius = 1d0 ! 
@@ -54,15 +56,13 @@ program OneDimWaveEqn
 
   delta_t = calculate_delta_t(my_mesh)
 
-  print *, delta_t
-
   call Initial_conditions(my_mesh)
 
   do timestep = 1, NUM_TIMESTEPS
-    call Increment_system(my_mesh, 8d0)
+    call Increment_system(my_mesh, 4.9d0)
     if (mod(timestep, SNAPSHOT_TIMESTEP) == 0) then
-      !call Output_3d_snapshot(OUTPUT_PATH, my_mesh, timestep)
-      print *, calculate_energy(my_mesh)
+      call Output_3d_snapshot(OUTPUT_PATH, my_mesh, timestep)
+      !print *, calculate_energy(my_mesh)
     endif
   enddo
 

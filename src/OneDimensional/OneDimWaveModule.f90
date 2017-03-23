@@ -81,8 +81,8 @@ module OneDimWaveModule
     enddo
 
     do i_spec = 1,num_spec_el
-      this%metric_det(:, i_spec) = (2. * r / (anchor_points(i_spec)-anchor_points(i_spec-1)))**2
-      this%inv_metric(:, i_spec) = ((anchor_points(i_spec)-anchor_points(i_spec-1)) / 2. * r)**2
+      this%metric_det(:, i_spec) = (2. * r * num_spec_el / (2 * PI))**2
+      this%inv_metric(:, i_spec) = 1 / this%metric_det(:, i_spec)
     enddo
 
     ! Local to global numbering
@@ -107,6 +107,11 @@ module OneDimWaveModule
     call set_density(this)
     call set_rigidity(this)
 
+    ! this%rho = (PI + 1) * sqrt(2*(PI + 1)*this%global_points + 1)
+    ! this%mu = sqrt(2*(PI + 1)*this%global_points + 1) / (PI + 1)
+
+    ! this%global_points = sqrt(2*(PI + 1)*this%global_points + 1) - 1
+
     this%mass_mat = mass_mat_glob(this)
 
     do i_glob = 1, this%num_global_points
@@ -119,11 +124,23 @@ module OneDimWaveModule
   function calculate_delta_t(this) result(delta_t)
     type(Mesh) this
     real(dp) delta_t, delta_h, max_vel
+    real(dp), allocatable :: c(:)
     real(dp) :: courant_CFL = 0.4d0 !CFL stability condition
 
+    integer i_glob, i_gll, i_spec
+
+    allocate(c(this%num_global_points))
+
     delta_h = 2 * PI * this%r / dble(this%num_global_points)
-    max_vel = maxval(sqrt(this%mu / this%rho))
+    do i_gll = 1, this%num_gll
+      do i_spec = 1, this%num_spec_el
+        i_glob = this%i_bool(i_gll, i_spec)
+        c(i_glob) = sqrt(this%inv_metric(i_gll, i_spec) * this%mu(i_glob) / this%rho(i_glob))
+      enddo
+    enddo
+    max_vel = maxval(c)
     delta_t = courant_CFL * delta_h / max_vel
+    print *, delta_t
   end function calculate_delta_t
 
   function mass_mat_glob(this) result(mass_mat)
@@ -226,7 +243,9 @@ module OneDimWaveModule
     type(Mesh) this
     integer i_glob
 
-    this%rho(:) = 1d0 + 10*this%global_points
+    this%rho = (1 + this%global_points)**2
+
+    !this%rho = (PI + 1) * (1 + this%global_points)
   end subroutine set_density
 
 !===============================================================================
@@ -236,16 +255,16 @@ module OneDimWaveModule
     type(Mesh) this
     integer i_glob
 
-    this%mu = 1d0 / (1d0 + 10*this%global_points)
+    this%mu = 1d0
+
+    !this%mu = 1 / ((1 + this%global_points) * (PI + 1))
   end subroutine set_rigidity
 
   subroutine Initial_conditions(this)
     type(Mesh) :: this
     integer i_displ, i_vel
 
-    do i_displ = 1, this%num_global_points
-      this%displ(i_displ) = exp(-10. * (this%global_points(i_displ) - this%global_points(this%num_global_points / 2))**2)
-    enddo
+    this%displ = exp(-10.*(this%global_points - PI)**2)
 
     do i_vel = 1, this%num_global_points
       this%vel(i_vel) = 0.
