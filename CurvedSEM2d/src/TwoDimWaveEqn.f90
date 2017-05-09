@@ -32,7 +32,7 @@
 !===============================================================================
 program TwoDimWaveEqn
 
-  use MeshModule
+  use MeshClass
   use WaveModule
 
   implicit none

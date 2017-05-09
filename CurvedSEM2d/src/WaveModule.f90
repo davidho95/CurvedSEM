@@ -1,6 +1,6 @@
 module WaveModule
 
-  use MeshModule
+  use MeshClass
 
   contains
 
@@ -218,5 +218,25 @@ module WaveModule
     enddo
 
   end function displ_on_torus
+
+  subroutine write_mesh(this)
+    type(Mesh) :: this
+    character(len=43) :: output_path = "/home/davidho/CurvedSEM/CurvedSEM2d/output/"
+    integer i_gll, j_gll, i_spec
+
+    open(unit=10, file=output_path//"mesh.in", action="write", status="unknown")
+    do i_spec = 1, this%total_num_spec
+      do i_gll = 1, this%num_gll
+        do j_gll = 1, this%num_gll
+        write(10,*) this%nodes(i_gll, j_gll, i_spec, :),&
+          this%metric_det(i_gll, j_gll, i_spec),&
+          this%inv_metric(i_gll, j_gll, i_spec, :, :),&
+          this%rho(i_gll, j_gll, i_spec),&
+          this%mu(i_gll, j_gll, i_spec, :, :)
+        enddo
+      enddo
+    enddo
+
+  end subroutine write_mesh
 
 end module WaveModule

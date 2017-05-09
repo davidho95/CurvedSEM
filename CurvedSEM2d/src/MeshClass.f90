@@ -1,4 +1,4 @@
-module MeshModule
+module MeshClass
 
   implicit none
 
@@ -136,7 +136,7 @@ module MeshModule
     allocate(this%torus_points(this%total_num_glob, 3))
     allocate(this%torus_normal(this%total_num_glob, 3))
 
-    this%torus_points = mesh_to_torus(this)
+    this%torus_points = get_torus_points(this)
     this%torus_normal = calculate_torus_normal(this)
 
   end subroutine initialise_mesh
@@ -208,27 +208,7 @@ module MeshModule
     enddo
   end function compute_metric
 
-  subroutine write_mesh(this)
-    type(Mesh) :: this
-    character(len=43) :: output_path = "/home/davidho/CurvedSEM/CurvedSEM2d/output/"
-    integer i_gll, j_gll, i_spec
-
-    open(unit=10, file=output_path//"mesh.in", action="write", status="unknown")
-    do i_spec = 1, this%total_num_spec
-      do i_gll = 1, this%num_gll
-        do j_gll = 1, this%num_gll
-        write(10,*) this%nodes(i_gll, j_gll, i_spec, :),&
-          this%metric_det(i_gll, j_gll, i_spec),&
-          this%inv_metric(i_gll, j_gll, i_spec, :, :),&
-          this%rho(i_gll, j_gll, i_spec),&
-          this%mu(i_gll, j_gll, i_spec, :, :)
-        enddo
-      enddo
-    enddo
-
-  end subroutine write_mesh
-
-  function mesh_to_torus(this) result(torus_points)
+  function get_torus_points(this) result(torus_points)
 
     implicit none
 
@@ -252,7 +232,7 @@ module MeshModule
         enddo
       enddo
     enddo
-  end function mesh_to_torus
+  end function get_torus_points
 
   function calculate_torus_normal(this) result(normal)
 
@@ -285,4 +265,4 @@ module MeshModule
     enddo
   end function calculate_torus_normal
 
-end module MeshModule
+end module MeshClass
